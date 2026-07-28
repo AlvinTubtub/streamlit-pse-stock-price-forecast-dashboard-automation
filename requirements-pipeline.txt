@@ -1,0 +1,10 @@
+# Minimal dependency set for run_pipeline.py / services/pdf_pipeline/.
+# Used by .github/workflows/update_data.yml so the scheduled data-update
+# job doesn't need to install the full app stack (torch, streamlit,
+# statsmodels, scikit-learn) just to download/parse/merge CSVs.
+#
+# For running the Streamlit app itself, use requirements.txt instead.
+pandas
+numpy
+pdfplumber
+requests

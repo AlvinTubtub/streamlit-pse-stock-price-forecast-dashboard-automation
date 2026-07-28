@@ -1,0 +1,1671 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ForecastPH | Educational Stock Forecasting</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Tailwind Config for Theme -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            900: '#1e3a8a',
+                            950: '#172554',
+                        },
+                        dark: {
+                            bg: '#0f172a',
+                            card: '#1e293b',
+                            border: '#334155'
+                        }
+                    },
+                    spacing: {
+                        '4': '1rem', // 8pt grid base
+                        '8': '2rem',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <!-- ApexCharts for Data Visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+
+    <style>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+
+        /* Chart Watermark Style */
+        .apexcharts-subtitle-text {
+            fill: #ef4444 !important; /* Red for emphasis on MOCK DATA */
+            font-weight: 700;
+            opacity: 0.7;
+        }
+
+        /* Glassmorphism utilities */
+        .glass {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        /* Hide elements util */
+        .hidden-view { display: none !important; }
+    </style>
+</head>
+<body class="bg-dark-bg text-slate-300 font-sans antialiased overflow-x-hidden min-h-screen flex flex-col">
+
+    <!-- Top Navigation (Desktop) -->
+    <nav class="fixed top-0 w-full glass z-50 border-b border-dark-border hidden md:block">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- Logo -->
+                <div class="flex items-center gap-2 cursor-pointer transition-transform hover:scale-105" onclick="nav('home')">
+                    <div class="bg-brand-600 text-white p-1.5 rounded-lg">
+                        <i class="ph-bold ph-trend-up text-xl"></i>
+                    </div>
+                    <span class="font-bold text-xl text-white tracking-tight">Forecast<span class="text-brand-400">PH</span></span>
+                </div>
+
+                <!-- Nav Links -->
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-1">
+                        <button onclick="nav('home')" class="nav-btn px-3 py-2 rounded-md text-sm font-medium hover:bg-white/5 hover:text-white transition-colors" data-target="home">Home</button>
+                        <button onclick="nav('companies')" class="nav-btn px-3 py-2 rounded-md text-sm font-medium hover:bg-white/5 hover:text-white transition-colors" data-target="companies">Company List</button>
+                        <button onclick="nav('compare')" class="nav-btn px-3 py-2 rounded-md text-sm font-medium hover:bg-white/5 hover:text-white transition-colors" data-target="compare">Model Performance</button>
+                        <button onclick="nav('live')" class="nav-btn px-3 py-2 rounded-md text-sm font-medium hover:bg-white/5 hover:text-white transition-colors text-brand-400" data-target="live"><i class="ph ph-lightning mr-1"></i>Live Prediction</button>
+                        <button onclick="nav('learn')" class="nav-btn px-3 py-2 rounded-md text-sm font-medium hover:bg-white/5 hover:text-white transition-colors" data-target="learn">Learn Stocks</button>
+                        <button onclick="nav('about')" class="nav-btn px-3 py-2 rounded-md text-sm font-medium hover:bg-white/5 hover:text-white transition-colors" data-target="about">About</button>
+                    </div>
+                </div>
+
+                <!-- Search (Desktop) -->
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="ph ph-magnifying-glass text-slate-400"></i>
+                    </div>
+                    <input type="text" id="globalSearch" class="block w-full pl-10 pr-3 py-1.5 border border-dark-border rounded-full leading-5 bg-dark-bg text-slate-300 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:border-brand-500 sm:text-sm transition-colors" placeholder="Search symbol or name...">
+                    <!-- Search Results Dropdown -->
+                    <div id="searchResults" class="absolute mt-1 w-full bg-dark-card border border-dark-border rounded-lg shadow-lg hidden z-50 max-h-60 overflow-y-auto"></div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Educational Warning Banner -->
+    <div class="bg-brand-900/50 border-b border-brand-500/30 text-center py-2 px-4 text-xs sm:text-sm text-brand-100 mt-0 md:mt-16 relative z-40">
+        <i class="ph-fill ph-info mr-1"></i>
+        <strong>Educational Purpose Only:</strong> Forecasts use real historical OHLCV data and trained models, but should not be used as financial advice.
+    </div>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 mb-20 md:mb-8" id="mainContent">
+        <!-- Views injected via JS -->
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-dark-card border-t border-dark-border py-6 mt-auto hidden md:block">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-sm text-slate-500">
+            &copy; 2026 BSIT Data Analytics Capstone Project. All rights reserved.
+        </div>
+    </footer>
+
+    <!-- Bottom Navigation (Mobile) -->
+    <nav class="md:hidden fixed bottom-0 w-full glass border-t border-dark-border z-50 pb-safe">
+        <div class="flex justify-around items-center h-16 px-2">
+            <button onclick="nav('home')" class="mobile-nav-btn flex flex-col items-center p-2 text-slate-400 hover:text-white" data-target="home">
+                <i class="ph ph-house text-xl mb-1"></i>
+                <span class="text-[10px]">Home</span>
+            </button>
+            <button onclick="nav('companies')" class="mobile-nav-btn flex flex-col items-center p-2 text-slate-400 hover:text-white" data-target="companies">
+                <i class="ph ph-buildings text-xl mb-1"></i>
+                <span class="text-[10px]">Companies</span>
+            </button>
+            <button onclick="nav('compare')" class="mobile-nav-btn flex flex-col items-center p-2 text-slate-400 hover:text-white" data-target="compare">
+                <i class="ph ph-chart-bar text-xl mb-1"></i>
+                <span class="text-[10px]">Performance</span>
+            </button>
+            <button onclick="nav('live')" class="mobile-nav-btn flex flex-col items-center p-2 text-brand-400 hover:text-brand-300" data-target="live">
+                <i class="ph-fill ph-lightning text-xl mb-1"></i>
+                <span class="text-[10px] font-medium">Live</span>
+            </button>
+            <button onclick="nav('learn')" class="mobile-nav-btn flex flex-col items-center p-2 text-slate-400 hover:text-white" data-target="learn">
+                <i class="ph ph-book-open text-xl mb-1"></i>
+                <span class="text-[10px]">Learn</span>
+            </button>
+            <button onclick="nav('about')" class="mobile-nav-btn flex flex-col items-center p-2 text-slate-400 hover:text-white" data-target="about">
+                <i class="ph ph-info text-xl mb-1"></i>
+                <span class="text-[10px]">About</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Real data injected by Streamlit (app.py) before this script runs.
+         __APP_DATA_JSON__ is replaced with real JSON at render time. -->
+    <script>
+        window.APP_DATA = __APP_DATA_JSON__;
+    </script>
+
+    <!-- Application Logic -->
+    <script>
+        // --- Data Definitions ---
+        const SECTORS = {
+            FINANCIALS: 'Financials',
+            INDUSTRIAL: 'Industrial',
+            PROPERTY: 'Property',
+            SERVICES: 'Services',
+            MINING_OIL: 'Mining and Oil'
+        };
+
+        // Real companies + latest close price, sourced from Python (services/data_loader.py)
+        const COMPANIES = window.APP_DATA.companies;
+
+        const MODELS = [
+            { id: 'lag_reg', name: 'Lag-Informed Regression' },
+            { id: 'arima', name: 'ARIMA' },
+            { id: 'lstm', name: 'LSTM' }
+        ];
+
+        // --- Real Data Accessors (replace old Math.random() mock generators) ---
+        // Returns real OHLCV history for a company symbol, computed by Python.
+        function generateOHLCV(symbol, days = 100) {
+            const company = COMPANIES.find(c => c.symbol === symbol);
+            if (!company || !company.ohlcv) return [];
+            const slice = company.ohlcv.slice(-days);
+            return slice.map(d => ({
+                date: new Date(d.date),
+                open: d.open, high: d.high, low: d.low, close: d.close, volume: d.volume
+            }));
+        }
+
+        // Returns real, precomputed model evaluation metrics for a model/company symbol.
+        // sector is kept as a parameter for backward compatibility with call sites.
+        function getRealMetrics(modelId, symbol) {
+            const perCompany = window.APP_DATA.metrics.bySymbol[symbol];
+            if (perCompany && perCompany[modelId]) return perCompany[modelId];
+            // Fall back to aggregate metrics if a per-company figure isn't available
+            return window.APP_DATA.metrics.aggregate[modelId];
+        }
+
+        // --- State Management ---
+        const state = {
+            currentView: 'home',
+            selectedCompany: null,
+            chartInstances: [],
+            radarChartInstance: null,
+            compareCharts: { radar: null, errorBar: null, r2Bar: null },
+            liveChartInstance: null
+        };
+
+        // --- Core Functions ---
+        
+        // Actually renders a view into #mainContent. Split out from nav() so that
+        // page-load initialization can jump straight to a view without re-triggering
+        // the Streamlit-page redirect logic in nav() below.
+        function renderView(view, params = null) {
+            state.currentView = view;
+
+            // Cleanup charts before changing views to prevent memory leaks
+            state.chartInstances.forEach(chart => chart.destroy());
+            state.chartInstances = [];
+
+            // Update UI Active States
+            document.querySelectorAll('.nav-btn, .mobile-nav-btn').forEach(btn => {
+                if(btn.dataset.target === view) {
+                    btn.classList.add('text-brand-400', 'bg-white/5');
+                    btn.classList.remove('text-slate-400');
+                    if(btn.classList.contains('nav-btn')) btn.classList.add('text-white');
+                } else {
+                    btn.classList.remove('text-brand-400', 'bg-white/5', 'text-white');
+                    if(btn.classList.contains('nav-btn')) { /* desktop default */ }
+                    else btn.classList.add('text-slate-400');
+                }
+            });
+
+            const main = document.getElementById('mainContent');
+            main.innerHTML = ''; // Clear current content
+            window.scrollTo(0, 0);
+
+            // Route to correct render function
+            switch(view) {
+                case 'home': main.innerHTML = renderHome(); break;
+                case 'companies': main.innerHTML = renderCompanyList(); setupCompanyFilters(); break;
+                case 'details': main.innerHTML = renderCompanyDetails(params); renderDetailsCharts(params); break;
+                case 'compare': main.innerHTML = renderCompare(); renderCompareCharts(); setupCompareFilters(); break;
+                case 'live': main.innerHTML = renderLivePrediction(); setupLivePrediction(); break;
+                case 'learn': main.innerHTML = renderLearn(); break;
+                case 'about': main.innerHTML = renderAbout(); break;
+                default: main.innerHTML = renderHome();
+            }
+        }
+
+        // Navigation Handler (used by nav-btn onclick handlers).
+        // The Live Prediction tab needs a *real* Streamlit file_uploader rendered in
+        // the main page (above this iframe), because only Python can validate the CSV
+        // and run the trained models. Streamlit has no visibility into which tab this
+        // embedded dashboard is showing, so entering/leaving the 'live' tab syncs a
+        // ?page=live URL param on the top-level Streamlit page (one real navigation),
+        // and app.py reads that param to decide whether to show the uploader there.
+        // Switches between all other tabs stay instant/client-side, no reload.
+        function nav(view, params = null) {
+            const enteringLive = view === 'live' && state.currentView !== 'live';
+            const leavingLive = view !== 'live' && state.currentView === 'live';
+
+            if (enteringLive || leavingLive) {
+                const url = new URL(window.top.location.href);
+                if (view === 'live') {
+                    url.searchParams.set('page', 'live');
+                } else {
+                    url.searchParams.delete('page');
+                }
+                window.top.location.href = url.toString();
+                return;
+            }
+
+            renderView(view, params);
+        }
+
+        // Global Search Setup
+        const searchInput = document.getElementById('globalSearch');
+        const searchResults = document.getElementById('searchResults');
+
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase();
+            if (query.length < 1) {
+                searchResults.classList.add('hidden');
+                return;
+            }
+
+            const matches = COMPANIES.filter(c => 
+                c.symbol.toLowerCase().includes(query) || 
+                c.name.toLowerCase().includes(query)
+            );
+
+            if (matches.length > 0) {
+                searchResults.innerHTML = matches.map(c => `
+                    <div class="px-4 py-2 hover:bg-white/5 cursor-pointer flex justify-between items-center border-b border-dark-border last:border-0" onclick="nav('details', '${c.symbol}'); document.getElementById('searchResults').classList.add('hidden'); document.getElementById('globalSearch').value=''">
+                        <div>
+                            <span class="font-bold text-white">${c.symbol}</span>
+                            <span class="text-sm text-slate-400 block">${c.name}</span>
+                        </div>
+                        <span class="text-xs bg-dark-bg px-2 py-1 rounded text-slate-300">${c.sector}</span>
+                    </div>
+                `).join('');
+                searchResults.classList.remove('hidden');
+            } else {
+                searchResults.innerHTML = '<div class="px-4 py-3 text-sm text-slate-500">No companies found.</div>';
+                searchResults.classList.remove('hidden');
+            }
+        });
+        
+        // Hide search results on click outside
+        document.addEventListener('click', (e) => {
+            if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+                searchResults.classList.add('hidden');
+            }
+        });
+
+        // --- STREAMING_CHUNK:Rendering Home Dashboard ---
+        function renderHome() {
+            return `
+                <div class="space-y-8 animate-[fadeIn_0.5s_ease-out]">
+                    <!-- Hero Section -->
+                    <div class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-900 to-dark-bg border border-dark-border p-8 md:p-12 shadow-2xl">
+                        <div class="absolute top-0 right-0 -mt-10 -mr-10 text-brand-500/10 hidden md:block">
+                            <i class="ph-fill ph-chart-line-up text-[20rem]"></i>
+                        </div>
+                        <div class="relative z-10 max-w-3xl">
+                            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-500/20 text-brand-300 text-sm font-medium mb-6 border border-brand-500/30">
+                                <i class="ph-fill ph-graduation-cap"></i> Educational Dashboard
+                            </div>
+                            <h1 class="text-4xl md:text-5xl font-bold text-white tracking-tight mb-4">
+                                Cross-Sector Next-Day <br class="hidden md:block"/>Stock Price Forecasting
+                            </h1>
+                            <p class="text-lg text-slate-300 mb-8 leading-relaxed max-w-2xl">
+                                Explore historical Philippine stock market data, compare machine learning and statistical models, and understand next-day price prediction techniques.
+                            </p>
+                            <div class="flex flex-wrap gap-4">
+                                <button onclick="nav('companies')" class="px-6 py-3 bg-brand-600 hover:bg-brand-500 text-white rounded-xl font-medium transition-colors shadow-lg shadow-brand-500/30 flex items-center gap-2">
+                                    Explore Forecasts <i class="ph ph-arrow-right"></i>
+                                </button>
+                                <button onclick="nav('live')" class="px-6 py-3 bg-dark-card border border-dark-border hover:bg-white/5 text-white rounded-xl font-medium transition-colors flex items-center gap-2">
+                                    <i class="ph ph-upload-simple text-brand-400"></i> Upload & Predict
+                                </button>
+                                <button onclick="nav('learn')" class="px-6 py-3 text-slate-300 hover:text-white transition-colors flex items-center gap-2 underline underline-offset-4">
+                                    Learn About Forecasting
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quick Stats -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="bg-dark-card border border-dark-border p-6 rounded-2xl shadow-sm flex items-start gap-4">
+                            <div class="p-3 bg-blue-500/10 rounded-xl text-blue-400">
+                                <i class="ph-fill ph-buildings text-2xl"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm text-slate-400 font-medium">Total Companies</p>
+                                <p class="text-2xl font-bold text-white">15</p>
+                                <p class="text-xs text-slate-500 mt-1">Across 5 PSE Sectors</p>
+                            </div>
+                        </div>
+                        <div class="bg-dark-card border border-dark-border p-6 rounded-2xl shadow-sm flex items-start gap-4">
+                            <div class="p-3 bg-purple-500/10 rounded-xl text-purple-400">
+                                <i class="ph-fill ph-brain text-2xl"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm text-slate-400 font-medium">Forecasting Models</p>
+                                <p class="text-2xl font-bold text-white">3</p>
+                                <p class="text-xs text-slate-500 mt-1">Lag-Informed Regression, ARIMA, LSTM</p>
+                            </div>
+                        </div>
+                        <div class="bg-dark-card border border-dark-border p-6 rounded-2xl shadow-sm flex items-start gap-4">
+                            <div class="p-3 bg-green-500/10 rounded-xl text-green-400">
+                                <i class="ph-fill ph-calendar-check text-2xl"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm text-slate-400 font-medium">Prediction Horizon</p>
+                                <p class="text-xl font-bold text-white mt-1">Next Trading Day</p>
+                                <p class="text-xs text-slate-500 mt-1">t+1 Forecasting</p>
+                            </div>
+                        </div>
+                        <div class="bg-dark-card border border-dark-border p-6 rounded-2xl shadow-sm flex items-start gap-4">
+                            <div class="p-3 bg-orange-500/10 rounded-xl text-orange-400">
+                                <i class="ph-fill ph-database text-2xl"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm text-slate-400 font-medium">Data Source</p>
+                                <p class="text-sm font-bold text-white mt-1">PSE EDGE</p>
+                                <p class="text-xs text-brand-400 mt-1">Synthesized for demo</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sector Overview (Visual interest) -->
+                    <div>
+                        <h2 class="text-xl font-bold text-white mb-4">Sectors Covered</h2>
+                        <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                            ${Object.values(SECTORS).map(sector => `
+                                <div class="bg-dark-card border border-dark-border rounded-xl p-4 text-center hover:border-brand-500/50 transition-colors cursor-pointer" onclick="nav('companies'); setTimeout(()=>document.getElementById('sectorFilter').value='${sector}', 50)">
+                                    <span class="text-sm font-medium text-slate-300 block">${sector}</span>
+                                    <span class="text-xs text-slate-500 mt-1">3 Companies</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- STREAMING_CHUNK:Rendering Company List ---
+        function renderCompanyList() {
+            return `
+                <div class="animate-[fadeIn_0.3s_ease-out]">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+                        <div>
+                            <h1 class="text-3xl font-bold text-white tracking-tight">Included Companies</h1>
+                            <p class="text-slate-400 mt-1">Select a company to view historical data and forecast results.</p>
+                        </div>
+                        <div class="flex w-full md:w-auto gap-2">
+                            <select id="sectorFilter" class="bg-dark-card border border-dark-border text-sm rounded-lg focus:ring-brand-500 focus:border-brand-500 block w-full p-2.5 text-white">
+                                <option value="all">All Sectors</option>
+                                ${Object.values(SECTORS).map(s => `<option value="${s}">${s}</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="companyGrid">
+                        ${COMPANIES.map(company => `
+                            <div class="company-card group bg-dark-card border border-dark-border rounded-2xl p-6 hover:border-brand-500/50 hover:shadow-lg hover:shadow-brand-500/10 transition-all cursor-pointer relative overflow-hidden" data-sector="${company.sector}" onclick="nav('details', '${company.symbol}')">
+                                <div class="absolute top-0 right-0 w-24 h-24 bg-brand-500/5 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
+                                <div class="flex justify-between items-start mb-4 relative z-10">
+                                    <div>
+                                        <h3 class="text-2xl font-bold text-white">${company.symbol}</h3>
+                                        <span class="text-xs font-medium px-2.5 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10 mt-2 inline-block">${company.sector}</span>
+                                    </div>
+                                    <div class="bg-dark-bg p-2 rounded-lg border border-dark-border">
+                                        <i class="ph-fill ph-chart-line-up text-brand-400 text-xl"></i>
+                                    </div>
+                                </div>
+                                <p class="text-slate-400 text-sm font-medium mb-6 relative z-10">${company.name}</p>
+                                <div class="flex justify-between items-center mt-auto pt-4 border-t border-dark-border relative z-10">
+                                    <span class="text-xs text-slate-500"><i class="ph ph-clock mr-1"></i>Mock Data Ready</span>
+                                    <span class="text-brand-400 text-sm font-medium flex items-center group-hover:translate-x-1 transition-transform">View Details <i class="ph ph-caret-right ml-1"></i></span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function setupCompanyFilters() {
+            const filter = document.getElementById('sectorFilter');
+            const cards = document.querySelectorAll('.company-card');
+            
+            filter.addEventListener('change', (e) => {
+                const selected = e.target.value;
+                cards.forEach(card => {
+                    if (selected === 'all' || card.dataset.sector === selected) {
+                        card.style.display = 'block';
+                    } else {
+                        card.style.display = 'none';
+                    }
+                });
+            });
+        }
+
+        // --- STREAMING_CHUNK:Rendering Company Details & Charts ---
+        function renderCompanyDetails(symbol) {
+            const company = COMPANIES.find(c => c.symbol === symbol);
+            if(!company) return `<div class="text-center py-20 text-red-400">Company not found.</div>`;
+
+            // Real latest close + real next-day prediction, computed in Python
+            const pred = window.APP_DATA.predictions[symbol] || {};
+            const mockLatestPrice = (company.latestClose ?? company.basePrice).toFixed(2);
+            const mockPredPrice = (pred.nextClose ?? company.latestClose ?? company.basePrice).toFixed(2);
+            const direction = mockPredPrice > mockLatestPrice ? 'Up' : 'Down';
+            const dirColor = direction === 'Up' ? 'text-green-400' : 'text-red-400';
+            const dirIcon = direction === 'Up' ? 'ph-trend-up' : 'ph-trend-down';
+
+            return `
+                <div class="animate-[fadeIn_0.3s_ease-out]">
+                    <!-- Back & Header -->
+                    <button onclick="nav('companies')" class="text-slate-400 hover:text-white text-sm flex items-center gap-1 mb-6 transition-colors">
+                        <i class="ph ph-arrow-left"></i> Back to Companies
+                    </button>
+                    
+                    <div class="bg-dark-card border border-dark-border rounded-2xl p-6 md:p-8 mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative overflow-hidden">
+                         <div class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjIiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wMykiLz48L3N2Zz4=')] opacity-50 pointer-events-none"></div>
+                        <div class="relative z-10">
+                            <div class="flex items-center gap-3 mb-2">
+                                <h1 class="text-4xl font-bold text-white tracking-tight">${company.symbol}</h1>
+                                <span class="bg-brand-900/50 text-brand-300 border border-brand-500/30 px-3 py-1 rounded-full text-xs font-semibold tracking-wide uppercase">${company.sector}</span>
+                            </div>
+                            <p class="text-lg text-slate-400">${company.name}</p>
+                        </div>
+                        <div class="bg-dark-bg border border-dark-border p-4 rounded-xl text-right relative z-10 w-full md:w-auto">
+                            <p class="text-sm text-slate-500 mb-1">Latest Close (Mock)</p>
+                            <p class="text-3xl font-bold text-white">₱${mockLatestPrice}</p>
+                            <p class="text-xs text-slate-500 mt-1">Date: 2026-07-20</p>
+                        </div>
+                    </div>
+
+                    <!-- Tabs -->
+                    <div class="border-b border-dark-border mb-6 flex overflow-x-auto hide-scrollbar">
+                        <button class="px-6 py-3 border-b-2 border-brand-500 text-brand-400 font-medium whitespace-nowrap">Historical Data & Forecast</button>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <!-- Left Col: Charts (Takes 2 columns on lg) -->
+                        <div class="lg:col-span-2 space-y-8">
+                            
+                            <!-- OHLCV Chart Card -->
+                            <div class="bg-dark-card border border-dark-border rounded-2xl p-4 md:p-6 shadow-sm">
+                                <div class="flex justify-between items-center mb-4">
+                                    <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                                        <i class="ph ph-chart-candlestick text-brand-400"></i> Historical OHLCV
+                                    </h3>
+                                    <span class="text-xs font-bold text-green-500 bg-green-500/10 px-2 py-1 rounded border border-green-500/20">REAL MODEL DATA</span>
+                                </div>
+                                <div id="candlestickChart" class="w-full h-[400px]"></div>
+                            </div>
+
+                            <!-- Actual vs Predicted Chart Card -->
+                            <div class="bg-dark-card border border-dark-border rounded-2xl p-4 md:p-6 shadow-sm">
+                                <div class="flex justify-between items-center mb-4">
+                                    <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                                        <i class="ph ph-chart-line text-brand-400"></i> Actual vs Predicted (Test Set)
+                                    </h3>
+                                    <span class="text-xs font-bold text-red-500 bg-red-500/10 px-2 py-1 rounded border border-red-500/20">ILLUSTRATIVE</span>
+                                </div>
+                                <div class="mb-4 flex gap-2">
+                                    <span class="text-sm text-slate-400">Displaying model:</span>
+                                    <select class="bg-dark-bg border border-dark-border text-xs rounded px-2 py-1 text-white outline-none">
+                                        <option>LSTM (Best Performing)</option>
+                                        <option>ARIMA</option>
+                                        <option>Lag-Informed Regression</option>
+                                    </select>
+                                </div>
+                                <div id="lineChart" class="w-full h-[300px]"></div>
+                            </div>
+                        </div>
+
+                        <!-- Right Col: Forecast Results & Info -->
+                        <div class="space-y-6">
+                            
+                            <!-- Next Day Forecast Card -->
+                            <div class="bg-gradient-to-br from-brand-900/40 to-dark-card border border-brand-500/30 rounded-2xl p-6 relative overflow-hidden">
+                                <div class="absolute top-0 right-0 p-4 opacity-10">
+                                    <i class="ph-fill ph-crystal-ball text-6xl text-brand-300"></i>
+                                </div>
+                                <h3 class="text-lg font-bold text-white mb-1 relative z-10">Next-Day Forecast</h3>
+                                <p class="text-xs text-brand-300 mb-6 relative z-10">Forecast Date: 2026-07-21</p>
+                                
+                                <div class="mb-6 relative z-10">
+                                    <p class="text-sm text-slate-400 mb-1">Predicted Closing Price</p>
+                                    <div class="flex items-baseline gap-3">
+                                        <span class="text-4xl font-bold text-white">₱${mockPredPrice}</span>
+                                        <span class="flex items-center text-sm font-semibold ${dirColor}">
+                                            <i class="ph-bold ${dirIcon} mr-1"></i> ${direction}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div class="space-y-3 relative z-10 border-t border-white/10 pt-4">
+                                    <div class="flex justify-between text-sm">
+                                        <span class="text-slate-400">Model Used:</span>
+                                        <span class="text-white font-medium">LSTM Ensemble</span>
+                                    </div>
+                                    <div class="flex justify-between text-sm">
+                                        <span class="text-slate-400">Data Source:</span>
+                                        <span class="text-white font-medium">Synthesized</span>
+                                    </div>
+                                </div>
+
+                                <div class="mt-6 bg-dark-bg/50 p-4 rounded-xl border border-white/5 relative z-10">
+                                    <p class="text-sm text-slate-300 italic leading-relaxed">
+                                        "The selected deep learning model predicts that ${company.symbol}'s closing price may <strong class="${dirColor}">slightly ${direction.toLowerCase()}</strong> on the next trading day based on identified historical sequence patterns."
+                                    </p>
+                                </div>
+                                
+                                <div class="mt-4 text-center">
+                                    <span class="text-[10px] uppercase font-bold text-red-400 tracking-wider">Illustrative Values Only</span>
+                                </div>
+                            </div>
+
+                            <!-- Educational Note -->
+                            <div class="bg-dark-card border border-dark-border rounded-2xl p-6">
+                                <h4 class="text-white font-semibold mb-2 flex items-center gap-2">
+                                    <i class="ph-fill ph-info text-brand-400"></i> Educational Note
+                                </h4>
+                                <p class="text-sm text-slate-400 leading-relaxed">
+                                    The charts and values presented here do not represent real-time connectivity to the Philippine Stock Exchange. They are synthesized based on historical characteristics to demonstrate the final output format of the capstone project's forecasting models.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- STREAMING_CHUNK:Rendering ApexCharts ---
+        function renderDetailsCharts(symbol) {
+            const company = COMPANIES.find(c => c.symbol === symbol);
+            if(!company) return;
+
+            const mockData = generateOHLCV(company.symbol, 60); // 60 days, real history
+            
+            // Format for ApexCandlestick
+            const candleSeriesData = mockData.map(d => ({
+                x: d.date,
+                y: [d.open, d.high, d.low, d.close]
+            }));
+
+            // Format for Volume (Bar chart underneath) - Simplified to just candlestick for visual cleanliness as requested by "modern clean"
+            
+            const candleOptions = {
+                series: [{ name: 'OHLC', data: candleSeriesData }],
+                chart: {
+                    type: 'candlestick',
+                    height: 400,
+                    background: 'transparent',
+                    toolbar: { show: false },
+                    animations: { enabled: false }
+                },
+                theme: { mode: 'dark' },
+                title: {
+                    text: '',
+                    align: 'center',
+                    style: { color: '#ef4444', fontSize: '10px', fontWeight: 'bold', cssClass: 'apexcharts-subtitle-text' }
+                },
+                xaxis: {
+                    type: 'datetime',
+                    labels: { style: { colors: '#94a3b8' } },
+                    axisBorder: { color: '#334155' },
+                    axisTicks: { color: '#334155' }
+                },
+                yaxis: {
+                    tooltip: { enabled: true },
+                    labels: {
+                        style: { colors: '#94a3b8' },
+                        formatter: (value) => '₱' + value.toFixed(2)
+                    }
+                },
+                plotOptions: {
+                    candlestick: {
+                        colors: { upward: '#22c55e', downward: '#ef4444' }
+                    }
+                },
+                grid: { borderColor: '#1e293b', strokeDashArray: 4 }
+            };
+
+            const candleChart = new ApexCharts(document.querySelector("#candlestickChart"), candleOptions);
+            candleChart.render();
+            state.chartInstances.push(candleChart);
+
+            // Actual vs Predicted Line Chart Data
+            const dates = mockData.slice(-30).map(d => d.date);
+            const actualPrices = mockData.slice(-30).map(d => d.close);
+            const backtest = (window.APP_DATA.predictions[symbol] || {}).backtest30 || [];
+            const predictedPrices = backtest.length === actualPrices.length ? backtest : actualPrices;
+
+            const lineOptions = {
+                series: [
+                    { name: "Actual Price", data: actualPrices },
+                    { name: "Predicted Price", data: predictedPrices }
+                ],
+                chart: {
+                    height: 300,
+                    type: 'line',
+                    background: 'transparent',
+                    toolbar: { show: false },
+                    animations: { enabled: true, easing: 'easeinout', speed: 800 }
+                },
+                theme: { mode: 'dark' },
+                colors: ['#cbd5e1', '#3b82f6'], // Slate for actual, Brand blue for predicted
+                dataLabels: { enabled: false },
+                stroke: { curve: 'smooth', width: 2 },
+                xaxis: {
+                    type: 'datetime',
+                    categories: dates,
+                    labels: { style: { colors: '#94a3b8' } },
+                    axisBorder: { color: '#334155' }
+                },
+                yaxis: {
+                    labels: {
+                        style: { colors: '#94a3b8' },
+                        formatter: (value) => '₱' + value.toFixed(1)
+                    }
+                },
+                grid: { borderColor: '#1e293b', strokeDashArray: 4 },
+                legend: { position: 'top', horizontalAlign: 'right', labels: { colors: '#cbd5e1' } }
+            };
+
+            const lineChart = new ApexCharts(document.querySelector("#lineChart"), lineOptions);
+            lineChart.render();
+            state.chartInstances.push(lineChart);
+        }
+
+        // --- STREAMING_CHUNK:Rendering Model Comparison ---
+        function renderCompare() {
+            // Group companies by sector for the dropdown
+            const groupedCompanies = Object.values(SECTORS).map(sector => {
+                const comps = COMPANIES.filter(c => c.sector === sector);
+                return `<optgroup label="${sector}">
+                            ${comps.map(c => `<option value="${c.symbol}">${c.symbol} - ${c.name}</option>`).join('')}
+                        </optgroup>`;
+            }).join('');
+
+            return `
+                <div class="animate-[fadeIn_0.3s_ease-out]">
+                    <!-- Header & Filter -->
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                        <div>
+                            <h1 class="text-3xl font-bold text-white tracking-tight">Model Performance</h1>
+                            <div id="compareCompanyInfo" class="mt-2 text-slate-400 text-sm flex items-center gap-2">
+                                <!-- Dynamic Subtitle Injected Here -->
+                            </div>
+                        </div>
+                        <div class="flex w-full md:w-auto gap-2">
+                            <select id="companyCompareFilter" class="bg-dark-card border border-dark-border text-sm rounded-lg focus:ring-brand-500 focus:border-brand-500 block w-full md:w-64 p-2.5 text-white">
+                                <option value="all">All Companies (Aggregate)</option>
+                                ${groupedCompanies}
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- 1. Performance Summary Cards -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                        <div class="bg-dark-card border border-dark-border rounded-xl p-5 shadow-sm relative overflow-hidden">
+                            <p class="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">BEST MODEL RMSE &darr;</p>
+                            <p class="text-3xl font-bold text-white mb-1" id="bestRmseVal">--</p>
+                            <p class="text-sm font-medium text-green-400 truncate" id="bestRmseModel">--</p>
+                        </div>
+                        <div class="bg-dark-card border border-dark-border rounded-xl p-5 shadow-sm relative overflow-hidden">
+                            <p class="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">BEST MODEL MAE &darr;</p>
+                            <p class="text-3xl font-bold text-white mb-1" id="bestMaeVal">--</p>
+                            <p class="text-sm font-medium text-slate-400 flex items-center gap-1">
+                                ₱ per prediction
+                            </p>
+                        </div>
+                        <div class="bg-dark-card border border-dark-border rounded-xl p-5 shadow-sm relative overflow-hidden">
+                            <p class="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">BEST MODEL MAPE &darr;</p>
+                            <p class="text-3xl font-bold text-white mb-1" id="bestMapeVal">--</p>
+                            <p class="text-sm font-medium text-slate-400 flex items-center gap-1 leading-tight pr-4">
+                                Scale-free – comparable across stocks
+                            </p>
+                        </div>
+                        <div class="bg-dark-card border border-dark-border rounded-xl p-5 shadow-sm relative overflow-hidden">
+                            <p class="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">BEST MODEL R² &uarr;</p>
+                            <p class="text-3xl font-bold text-white mb-1" id="bestR2Val">--</p>
+                            <p class="text-sm font-medium text-slate-400 truncate flex items-center gap-1">
+                                <span id="bestR2Model" class="text-green-400 font-medium"></span>
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+                        <!-- 2. Best Model Summary -->
+                        <div class="lg:col-span-2 bg-gradient-to-r from-brand-900/40 to-dark-card border border-brand-500/30 rounded-xl p-5 flex items-center gap-4">
+                            <div class="hidden sm:flex shrink-0 w-12 h-12 bg-brand-500/20 text-brand-400 rounded-full items-center justify-center border border-brand-500/30">
+                                <i class="ph-fill ph-trophy text-2xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-bold text-white mb-1 flex items-center gap-2">
+                                    Overall Best Model
+                                </h3>
+                                <p class="text-sm text-slate-300 leading-relaxed" id="overallBestDesc">
+                                    --
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- 4. Metrics Interpretation -->
+                        <div class="bg-dark-card border border-dark-border rounded-xl p-5 flex items-center">
+                            <div>
+                                <h3 class="text-sm font-bold text-white mb-2 flex items-center gap-1"><i class="ph-fill ph-info text-blue-400"></i> How to Interpret</h3>
+                                <ul class="text-xs text-slate-400 space-y-1">
+                                    <li><span class="text-green-400 font-bold">&darr; Lower</span> RMSE, MAE, and MAPE indicate better prediction accuracy.</li>
+                                    <li><span class="text-green-400 font-bold">&uarr; Higher</span> R² indicates the model explains more of the actual price variation.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 5. Model Performance Charts -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <!-- Error Metrics Grouped Bar Chart -->
+                        <div class="bg-dark-card border border-dark-border rounded-2xl p-4 flex flex-col">
+                            <div class="flex justify-between items-center mb-2">
+                                <h3 class="text-sm font-bold text-white">RMSE and MAE by model, with naive baseline (lower = better)</h3>
+                                <span class="text-[9px] font-bold text-green-500 bg-green-500/10 px-1.5 py-0.5 rounded border border-green-500/20">REAL MODEL DATA</span>
+                            </div>
+                            <div id="errorBarChart" class="w-full flex-grow min-h-[250px]"></div>
+                        </div>
+
+                        <!-- R2 Bar Chart -->
+                        <div class="bg-dark-card border border-dark-border rounded-2xl p-4 flex flex-col">
+                            <div class="flex justify-between items-center mb-2">
+                                <h3 class="text-sm font-bold text-white">R² by model, with naive baseline (higher = better)</h3>
+                                <span class="text-[9px] font-bold text-green-500 bg-green-500/10 px-1.5 py-0.5 rounded border border-green-500/20">REAL MODEL DATA</span>
+                            </div>
+                            <div id="r2BarChart" class="w-full flex-grow min-h-[250px]"></div>
+                        </div>
+                    </div>
+
+                    <!-- 3. Full Performance Metrics Table -->
+                    <div class="bg-dark-card border border-dark-border rounded-2xl overflow-hidden shadow-sm mb-6">
+                        <div class="p-4 border-b border-dark-border flex flex-col sm:flex-row sm:justify-between sm:items-center bg-dark-bg/50 gap-2">
+                            <h3 class="text-sm font-bold text-white">Detailed Performance Comparison</h3>
+                            <span class="text-[10px] font-bold text-brand-300 bg-brand-900/30 border border-brand-500/30 px-2 py-1 rounded inline-block w-max">
+                                Computed from your trained models on real OHLCV data.
+                            </span>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm text-slate-300">
+                                <thead class="text-xs text-slate-400 uppercase bg-dark-bg/80 border-b border-dark-border">
+                                    <tr>
+                                        <th scope="col" class="px-6 py-4">Model</th>
+                                        <th scope="col" class="px-6 py-4">RMSE &darr;</th>
+                                        <th scope="col" class="px-6 py-4">MAE &darr;</th>
+                                        <th scope="col" class="px-6 py-4">MAPE &darr;</th>
+                                        <th scope="col" class="px-6 py-4">R² &uarr;</th>
+                                        <th scope="col" class="px-6 py-4">Rank</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="perfTableBody">
+                                    <!-- Injected via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderCompareCharts() {
+            const commonOptions = {
+                chart: { background: 'transparent', toolbar: { show: false }, animations: { enabled: true } },
+                theme: { mode: 'dark' },
+                grid: { borderColor: '#1e293b', strokeDashArray: 3 }
+            };
+
+            // 1. Error Metrics Bar Chart (RMSE & MAE)
+            const errorOptions = {
+                ...commonOptions,
+                chart: { ...commonOptions.chart, type: 'bar', height: 280 },
+                series: [{ name: 'RMSE', data: [0, 0, 0, 0] }, { name: 'MAE', data: [0, 0, 0, 0] }],
+                colors: ['#60a5fa', '#93c5fd'], // Brand blues
+                plotOptions: { bar: { horizontal: false, columnWidth: '55%', borderRadius: 2 } },
+                dataLabels: { enabled: false },
+                xaxis: { categories: ['Lag-Informed Regression', 'ARIMA', 'LSTM', 'Naive baseline'], labels: { style: { colors: '#94a3b8', fontSize: '11px' } }, axisBorder: { show: false } },
+                yaxis: { labels: { style: { colors: '#94a3b8', fontSize: '11px' } } },
+                legend: { position: 'top', labels: { colors: '#cbd5e1' } }
+            };
+            state.compareCharts.errorBar = new ApexCharts(document.querySelector("#errorBarChart"), errorOptions);
+            state.compareCharts.errorBar.render();
+            state.chartInstances.push(state.compareCharts.errorBar);
+
+            // 2. R2 Score Bar Chart
+            const r2Options = {
+                ...commonOptions,
+                chart: { ...commonOptions.chart, type: 'bar', height: 280 },
+                series: [{ name: 'R² Score', data: [0, 0, 0, 0] }],
+                colors: ['#7dd3fc', '#a78bfa', '#fb923c', '#94a3b8'], // Light Blue, Purple, Orange, Gray matching the models
+                plotOptions: { bar: { horizontal: false, columnWidth: '40%', borderRadius: 2, distributed: true } },
+                dataLabels: { enabled: false },
+                xaxis: { categories: ['Lag-Informed Regression', 'ARIMA', 'LSTM', 'Naive baseline'], labels: { style: { colors: '#94a3b8', fontSize: '11px' } }, axisBorder: { show: false } },
+                yaxis: { max: 1.0, min: 0, labels: { style: { colors: '#94a3b8', fontSize: '11px' } } },
+                legend: { show: false }
+            };
+            state.compareCharts.r2Bar = new ApexCharts(document.querySelector("#r2BarChart"), r2Options);
+            state.compareCharts.r2Bar.render();
+            state.chartInstances.push(state.compareCharts.r2Bar);
+            
+            // Trigger initial data load
+            updateCompareData('all');
+        }
+
+        function setupCompareFilters() {
+            const filter = document.getElementById('companyCompareFilter');
+            filter.addEventListener('change', (e) => {
+                const symbol = e.target.value;
+                updateCompareData(symbol);
+            });
+        }
+
+        function updateCompareData(symbol) {
+            let lagMetrics, arimaMetrics, lstmMetrics, naiveMetrics;
+            let companyInfoHtml = '';
+
+            if (symbol === 'all') {
+                const agg = window.APP_DATA.metrics.aggregate;
+                lagMetrics = agg.lag_reg;
+                arimaMetrics = agg.arima;
+                lstmMetrics = agg.lstm;
+                naiveMetrics = agg.naive;
+                
+                companyInfoHtml = `
+                    <span class="font-semibold text-brand-400">Aggregate Data</span>
+                    <span class="text-slate-500">|</span> 
+                    <span>All ${COMPANIES.length} Companies Across Sectors</span>
+                `;
+            } else {
+                const company = COMPANIES.find(c => c.symbol === symbol);
+                const m1 = getRealMetrics('lag_reg', symbol);
+                const m2 = getRealMetrics('arima', symbol);
+                const m3 = getRealMetrics('lstm', symbol);
+                const m4 = getRealMetrics('naive', symbol);
+                
+                lagMetrics = m1; arimaMetrics = m2; lstmMetrics = m3; naiveMetrics = m4;
+                
+                companyInfoHtml = `
+                    <span class="font-bold text-white px-2 py-0.5 bg-dark-bg rounded border border-dark-border">${company.symbol}</span>
+                    <span class="text-slate-300">${company.name}</span>
+                    <span class="text-slate-500">|</span> 
+                    <span class="text-brand-400 font-medium text-xs uppercase tracking-wider">${company.sector}</span>
+                `;
+            }
+
+            document.getElementById('compareCompanyInfo').innerHTML = companyInfoHtml;
+
+            const models = [
+                { id: 'Lag-Informed Regression', m: lagMetrics },
+                { id: 'ARIMA', m: arimaMetrics },
+                { id: 'LSTM', m: lstmMetrics }
+            ];
+            
+            const bestRmse = models.reduce((min, p) => parseFloat(p.m.rmse) < parseFloat(min.m.rmse) ? p : min, models[0]);
+            const bestMae = models.reduce((min, p) => parseFloat(p.m.mae) < parseFloat(min.m.mae) ? p : min, models[0]);
+            const bestMape = models.reduce((min, p) => parseFloat(p.m.mape) < parseFloat(min.m.mape) ? p : min, models[0]);
+            const bestR2 = models.reduce((max, p) => parseFloat(p.m.r2) > parseFloat(max.m.r2) ? p : max, models[0]);
+
+            // Update Summary Cards
+            document.getElementById('bestRmseVal').innerText = bestRmse.m.rmse;
+            document.getElementById('bestRmseModel').innerText = bestRmse.id;
+            
+            document.getElementById('bestMaeVal').innerText = bestMae.m.mae;
+            
+            document.getElementById('bestMapeVal').innerText = bestMape.m.mape + '%';
+            
+            document.getElementById('bestR2Val').innerText = bestR2.m.r2;
+            document.getElementById('bestR2Model').innerText = "Naive baseline R² = " + naiveMetrics.r2;
+            
+            document.getElementById('overallBestDesc').innerText = `${bestRmse.id} demonstrated the strongest ability to capture complex market patterns for this selection, achieving the lowest overall prediction errors.`;
+
+            // Calculate Rankings (1 = Best, based on RMSE)
+            const competingModels = [...models];
+            const naiveModel = { id: 'Naive baseline', m: naiveMetrics };
+
+            const rankedModels = [...competingModels].sort((a, b) => parseFloat(a.m.rmse) - parseFloat(b.m.rmse));
+            competingModels.forEach(model => {
+                model.rank = rankedModels.findIndex(m => m.id === model.id) + 1;
+                model.beatsNaive = parseFloat(model.m.rmse) < parseFloat(naiveModel.m.rmse);
+            });
+
+            // Sort models to display Best first
+            competingModels.sort((a, b) => a.rank - b.rank);
+
+            // Update Table
+            const renderRow = (modelObj, isNaive = false) => {
+                if (isNaive) {
+                    return `
+                        <tr class="border-b border-dark-border/50 bg-dark-bg/30 text-slate-400 italic hover:bg-white/5 transition-colors">
+                            <td class="px-6 py-4 font-bold text-sm text-slate-400">${modelObj.id}</td>
+                            <td class="px-6 py-4">${modelObj.m.rmse}</td>
+                            <td class="px-6 py-4">${modelObj.m.mae}</td>
+                            <td class="px-6 py-4">${modelObj.m.mape}%</td>
+                            <td class="px-6 py-4">${modelObj.m.r2}</td>
+                            <td class="px-6 py-4">
+                                <span class="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold bg-slate-800 text-slate-400">reference</span>
+                            </td>
+                        </tr>
+                    `;
+                }
+
+                const isBest = modelObj.rank === 1;
+                const rankText = isBest ? 'Best' : (modelObj.rank === 2 ? '2nd' : '3rd');
+                const rankBadge = isBest 
+                    ? `<span class="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold bg-green-500/20 text-green-400 border border-green-500/30"><i class="ph-fill ph-star mr-1"></i> Best</span>`
+                    : `<span class="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold bg-slate-800 text-brand-300 border border-slate-700">${rankText}</span>`;
+                
+                const naiveBadge = modelObj.beatsNaive
+                    ? `<span class="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold bg-green-900/40 text-green-400 ml-2">beats naive</span>`
+                    : `<span class="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold bg-red-900/40 text-red-400 ml-2"><i class="ph-bold ph-warning mr-1"></i> below naive</span>`;
+
+                return `
+                    <tr class="border-b border-dark-border/50 hover:bg-white/5 transition-colors ${isBest ? 'bg-green-900/10' : ''}">
+                        <td class="px-6 py-4 text-white font-bold text-sm">${modelObj.id}</td>
+                        <td class="px-6 py-4 ${isBest ? 'font-bold text-white' : 'text-slate-300'}">${modelObj.m.rmse}</td>
+                        <td class="px-6 py-4 ${isBest ? 'font-bold text-white' : 'text-slate-300'}">${modelObj.m.mae}</td>
+                        <td class="px-6 py-4 ${isBest ? 'font-bold text-white' : 'text-slate-300'}">${modelObj.m.mape}%</td>
+                        <td class="px-6 py-4 ${isBest ? 'font-bold text-white' : 'text-slate-300'}">${modelObj.m.r2}</td>
+                        <td class="px-6 py-4 flex items-center">
+                            ${rankBadge}
+                            ${naiveBadge}
+                        </td>
+                    </tr>
+                `;
+            };
+
+            let tableHtml = competingModels.map(m => renderRow(m, false)).join('');
+            tableHtml += renderRow(naiveModel, true);
+            
+            document.getElementById('perfTableBody').innerHTML = tableHtml;
+
+            // Update Charts
+            if (state.compareCharts.errorBar) {
+                state.compareCharts.errorBar.updateSeries([
+                    { name: 'RMSE', data: [parseFloat(lagMetrics.rmse), parseFloat(arimaMetrics.rmse), parseFloat(lstmMetrics.rmse), parseFloat(naiveMetrics.rmse)] },
+                    { name: 'MAE', data: [parseFloat(lagMetrics.mae), parseFloat(arimaMetrics.mae), parseFloat(lstmMetrics.mae), parseFloat(naiveMetrics.mae)] }
+                ]);
+            }
+            if (state.compareCharts.r2Bar) {
+                state.compareCharts.r2Bar.updateSeries([
+                    { name: 'R² Score', data: [parseFloat(lagMetrics.r2), parseFloat(arimaMetrics.r2), parseFloat(lstmMetrics.r2), parseFloat(naiveMetrics.r2)] }
+                ]);
+            }
+        }
+
+        // --- STREAMING_CHUNK:Rendering Live Prediction (Advanced Feature) ---
+        function renderLivePrediction() {
+            return `
+                <div class="max-w-4xl mx-auto animate-[fadeIn_0.3s_ease-out]">
+                    <div class="text-center mb-8">
+                        <h1 class="text-3xl font-bold text-white tracking-tight flex items-center justify-center gap-2">
+                            <i class="ph-fill ph-lightning text-brand-400"></i> Live Prediction
+                        </h1>
+                        <p class="text-slate-400 mt-2 max-w-2xl mx-auto">Upload an OHLCV dataset to generate a next-day forecast using pre-trained models.</p>
+                    </div>
+
+                    <!-- Info Card -->
+                    <div class="bg-blue-900/20 border border-blue-500/30 rounded-xl p-4 mb-8 flex items-start gap-3">
+                        <i class="ph-fill ph-info text-blue-400 text-xl mt-0.5 shrink-0"></i>
+                        <p class="text-sm text-blue-100 leading-relaxed">
+                            Upload a properly formatted OHLCV (Open, High, Low, Close, Volume) CSV file. Uploaded datasets are processed <strong>only for prediction</strong> and do not retrain or modify the models developed in this research.
+                        </p>
+                    </div>
+
+                    <!-- Upload UI: the real file uploader is a native Streamlit widget rendered
+                         directly above this dashboard on this page (not in the sidebar), because
+                         it needs to reach the Python backend to validate the CSV and run the
+                         trained models. This panel just reflects whether that upload has happened yet. -->
+                    <div id="uploadSection" class="bg-dark-card border border-dark-border rounded-2xl p-8 mb-8 text-center shadow-lg">
+                        <div class="border-2 border-dashed border-dark-border rounded-xl p-10 bg-dark-bg/50" id="dropZone">
+                            <div class="w-16 h-16 bg-brand-500/10 text-brand-400 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <i class="ph ph-upload-simple text-3xl"></i>
+                            </div>
+                            <h3 class="text-lg font-semibold text-white mb-1">Use the "Upload OHLCV CSV" control above this dashboard</h3>
+                            <p class="text-sm text-slate-400 mb-2">This dashboard refreshes automatically once a file is uploaded there — no need to interact here.</p>
+                        </div>
+
+                        <div class="mt-6 flex flex-col sm:flex-row justify-center items-center gap-4 text-sm">
+                            <div class="text-slate-500">Required columns: <span class="font-mono text-slate-300 bg-dark-bg px-1 rounded">Date, Open, High, Low, Close, Volume</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Processing State (Hidden initially) -->
+                    <div id="processingSection" class="hidden bg-dark-card border border-dark-border rounded-2xl p-8 mb-8 text-center shadow-lg">
+                        <i class="ph ph-spinner-gap animate-spin text-4xl text-brand-500 mb-4 inline-block"></i>
+                        <h3 class="text-lg font-semibold text-white" id="processStatusText">Validating CSV Format...</h3>
+                        
+                        <div class="mt-6 text-left max-w-sm mx-auto space-y-3" id="validationLogs">
+                            <!-- Logs injected via JS -->
+                        </div>
+                    </div>
+
+                    <!-- Prediction Setup & Results (Hidden initially) -->
+                    <div id="predictionSetupSection" class="hidden space-y-8">
+                        
+                        <div class="bg-green-900/20 border border-green-500/30 rounded-xl p-4 flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <i class="ph-fill ph-check-circle text-green-400 text-xl"></i>
+                                <span class="text-green-100 font-medium text-sm">CSV Validation Passed successfully. Ready for prediction.</span>
+                            </div>
+                            <button onclick="resetLivePrediction()" class="text-xs text-slate-400 hover:text-white underline">Upload new</button>
+                        </div>
+
+                        <div class="bg-dark-card border border-dark-border rounded-2xl p-6 shadow-sm">
+                            <h3 class="text-lg font-bold text-white mb-4">Dataset Preview (First 5 Rows)</h3>
+                            <div class="overflow-x-auto rounded-lg border border-dark-border">
+                                <table class="w-full text-left text-xs text-slate-300">
+                                    <thead class="bg-dark-bg text-slate-400 uppercase">
+                                        <tr>
+                                            <th class="px-4 py-3">Date</th><th class="px-4 py-3">Open</th><th class="px-4 py-3">High</th><th class="px-4 py-3">Low</th><th class="px-4 py-3 font-bold text-brand-300">Close</th><th class="px-4 py-3">Volume</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="previewTableBody">
+                                        <!-- Mock injected -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="bg-dark-card border border-dark-border rounded-2xl p-6 shadow-sm">
+                            <h3 class="text-lg font-bold text-white mb-4">Select Forecasting Model</h3>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <label class="cursor-pointer">
+                                    <input type="radio" name="modelSelect" value="lag" class="peer hidden" checked>
+                                    <div class="border border-dark-border rounded-xl p-4 peer-checked:border-brand-500 peer-checked:bg-brand-900/20 transition-all text-center h-full flex flex-col justify-center">
+                                        <span class="block font-semibold text-white mb-1">Lag Reg</span>
+                                        <span class="text-[10px] sm:text-xs text-slate-400">Baseline stat</span>
+                                    </div>
+                                </label>
+                                <label class="cursor-pointer">
+                                    <input type="radio" name="modelSelect" value="arima" class="peer hidden">
+                                    <div class="border border-dark-border rounded-xl p-4 peer-checked:border-brand-500 peer-checked:bg-brand-900/20 transition-all text-center h-full flex flex-col justify-center">
+                                        <span class="block font-semibold text-white mb-1">ARIMA</span>
+                                        <span class="text-[10px] sm:text-xs text-slate-400">Time-series</span>
+                                    </div>
+                                </label>
+                                <label class="cursor-pointer">
+                                    <input type="radio" name="modelSelect" value="lstm" class="peer hidden">
+                                    <div class="border border-dark-border rounded-xl p-4 peer-checked:border-brand-500 peer-checked:bg-brand-900/20 transition-all text-center h-full flex flex-col justify-center relative overflow-hidden">
+                                        <div class="absolute top-0 right-0 bg-brand-500 text-white text-[8px] sm:text-[9px] font-bold px-1.5 py-0.5 rounded-bl-lg">RECOMMENDED</div>
+                                        <span class="block font-semibold text-white mb-1">LSTM</span>
+                                        <span class="text-[10px] sm:text-xs text-slate-400">Deep Learning</span>
+                                    </div>
+                                </label>
+                                <label class="cursor-pointer">
+                                    <input type="radio" name="modelSelect" value="all" class="peer hidden">
+                                    <div class="border border-dark-border rounded-xl p-4 peer-checked:border-brand-500 peer-checked:bg-brand-900/20 transition-all text-center h-full flex flex-col justify-center">
+                                        <span class="block font-semibold text-white mb-1">All three</span>
+                                        <span class="text-[10px] sm:text-xs text-slate-400">(Compare)</span>
+                                    </div>
+                                </label>
+                            </div>
+                            
+                            <button id="btnRunPrediction" class="w-full mt-6 py-4 bg-brand-600 hover:bg-brand-500 text-white rounded-xl font-bold text-lg shadow-lg shadow-brand-500/20 transition-colors flex items-center justify-center gap-2">
+                                <i class="ph-bold ph-magic-wand"></i> Predict Next-Day Forecast
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Final Results View (Hidden initially) -->
+                    <div id="finalResultsSection" class="hidden space-y-6 mt-8 border-t border-dark-border pt-8 animate-[fadeIn_0.5s_ease-out]">
+                         <!-- Result Card injected here via JS -->
+                    </div>
+
+                    <!-- Disclaimer -->
+                    <div class="mt-8 text-center text-xs text-slate-500 max-w-3xl mx-auto pb-8">
+                        "This feature is designed for educational exploration only. Uploaded datasets are used solely to generate predictions using the pre-trained forecasting models developed in this research. The uploaded data does not retrain, modify, or replace the models, and the generated results should not be interpreted as financial or investment advice."
+                    </div>
+                </div>
+            `;
+        }
+
+        function setupLivePrediction() {
+            const uploadSection = document.getElementById('uploadSection');
+            const setupSection = document.getElementById('predictionSetupSection');
+            const btnPredict = document.getElementById('btnRunPrediction');
+
+            // Real validation + inference already happened in Python (services/data_validator.py,
+            // services/forecasting.py) the moment the user uploaded a CSV in the sidebar. This
+            // component just reflects whatever window.APP_DATA.livePrediction currently holds.
+            const live = window.APP_DATA.livePrediction;
+
+            if (live && live.ready) {
+                uploadSection.classList.add('hidden');
+                setupSection.classList.remove('hidden');
+                renderPreviewTable(live.previewRows);
+            }
+
+            btnPredict.addEventListener('click', () => {
+                showPredictionResults();
+            });
+        }
+
+        // Renders the real first-5-rows of the validated, uploaded CSV.
+        function renderPreviewTable(rows) {
+            const tbody = document.getElementById('previewTableBody');
+            if (!rows || !rows.length) { tbody.innerHTML = ''; return; }
+            tbody.innerHTML = rows.map(r => `
+                <tr class="border-b border-dark-border/30 last:border-0 hover:bg-white/5">
+                    <td class="px-4 py-2">${r.date}</td>
+                    <td class="px-4 py-2">${r.open.toFixed(2)}</td>
+                    <td class="px-4 py-2">${r.high.toFixed(2)}</td>
+                    <td class="px-4 py-2">${r.low.toFixed(2)}</td>
+                    <td class="px-4 py-2 font-semibold text-white">${r.close.toFixed(2)}</td>
+                    <td class="px-4 py-2">${r.volume}</td>
+                </tr>
+            `).join('');
+        }
+
+        function showPredictionResults() {
+            const resultsSection = document.getElementById('finalResultsSection');
+            const model = document.querySelector('input[name="modelSelect"]:checked').value;
+            const live = window.APP_DATA.livePrediction;
+
+            // Real recent-history series (from the uploaded CSV) for the chart
+            const historicalData = (live.historical || []).map(d => ({ x: d.x, y: d.y }));
+            const lastPrice = historicalData.length ? historicalData[historicalData.length - 1].y : 0;
+
+            // Real next-day predictions, one per trained model
+            const preds = live.predictions; // { lag, arima, lstm }
+            
+            if (model === 'all') {
+                const predsArr = [
+                    { name: 'Lag-Informed Regression', price: preds.lag },
+                    { name: 'ARIMA', price: preds.arima },
+                    { name: 'LSTM', price: preds.lstm }
+                ];
+                
+                const cardsHtml = predsArr.map(p => {
+                    const diff = (p.price - lastPrice).toFixed(2);
+                    const isUp = diff >= 0;
+                    const colorClass = isUp ? 'text-green-400' : 'text-red-400';
+                    const iconClass = isUp ? 'ph-trend-up' : 'ph-trend-down';
+                    const changeStr = isUp ? `+₱${diff}` : `-₱${Math.abs(diff)}`;
+                    
+                    return `
+                        <div class="bg-dark-bg p-4 md:p-6 rounded-2xl border border-dark-border min-w-[200px]">
+                            <p class="text-xs text-brand-400 font-semibold mb-2 uppercase tracking-wider">${p.name}</p>
+                            <p class="text-3xl font-bold text-white mb-2">₱${p.price}</p>
+                            <p class="${colorClass} font-medium flex items-center justify-center gap-1 text-sm">
+                                <i class="ph-bold ${iconClass}"></i> ${changeStr} (${((diff/lastPrice)*100).toFixed(2)}%)
+                            </p>
+                        </div>
+                    `;
+                }).join('');
+
+                resultsSection.innerHTML = `
+                    <div class="bg-dark-card border-2 border-brand-500 rounded-2xl p-8 relative overflow-hidden text-center shadow-[0_0_30px_rgba(59,130,246,0.15)]">
+                        
+                        
+                        <h2 class="text-2xl font-bold text-white mb-2">Forecast Comparison Generated</h2>
+                        <p class="text-slate-400 mb-8">Model Used: <span class="text-white font-medium">All Models (Ensemble View)</span></p>
+
+                        <div class="mb-6">
+                            <p class="text-sm text-slate-500 mb-1">Last Uploaded Close</p>
+                            <p class="text-2xl font-bold text-slate-300">₱${lastPrice.toFixed(2)}</p>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                            ${cardsHtml}
+                        </div>
+
+                        <div class="max-w-2xl mx-auto bg-blue-900/10 border border-blue-500/20 p-4 rounded-xl mb-8">
+                            <p class="text-sm text-slate-300 italic">
+                                "By comparing all three models, we can observe slight variations in their next-day predictions based on the uploaded historical data. LSTM often uncovers complex sequence patterns, while ARIMA and Lag Regression prioritize trends and immediate historical correlations. This comparison is for educational purposes only."
+                            </p>
+                        </div>
+
+                        <div class="bg-dark-bg/50 p-4 rounded-xl border border-dark-border">
+                            <div id="livePredictionChart" class="w-full h-[350px]"></div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                const modelName = model === 'lstm' ? 'LSTM' : model === 'arima' ? 'ARIMA' : 'Lag-Informed Regression';
+                const predPrice = preds[model];
+                const diff = (predPrice - lastPrice).toFixed(2);
+                const isUp = diff >= 0;
+                const colorClass = isUp ? 'text-green-400' : 'text-red-400';
+                const iconClass = isUp ? 'ph-trend-up' : 'ph-trend-down';
+                const changeStr = isUp ? `+₱${diff}` : `-₱${Math.abs(diff)}`;
+
+                resultsSection.innerHTML = `
+                    <div class="bg-dark-card border-2 border-brand-500 rounded-2xl p-8 relative overflow-hidden text-center shadow-[0_0_30px_rgba(59,130,246,0.15)]">
+                        
+                        
+                        <h2 class="text-2xl font-bold text-white mb-2">Prediction Generated Successfully</h2>
+                        <p class="text-slate-400 mb-8">Model Used: <span class="text-white font-medium">${modelName}</span></p>
+
+                        <div class="flex flex-col md:flex-row items-center justify-center gap-8 mb-8">
+                            <div class="text-center">
+                                <p class="text-sm text-slate-500 mb-1">Last Uploaded Close</p>
+                                <p class="text-2xl font-bold text-slate-300">₱${lastPrice.toFixed(2)}</p>
+                            </div>
+                            <div class="hidden md:block text-slate-600"><i class="ph-bold ph-arrow-right text-3xl"></i></div>
+                            <div class="text-center bg-dark-bg p-6 rounded-2xl border border-dark-border min-w-[200px]">
+                                <p class="text-sm text-brand-400 font-semibold mb-1 uppercase tracking-wider">Next-Day Forecast</p>
+                                <p class="text-5xl font-bold text-white mb-2">₱${predPrice}</p>
+                                <p class="${colorClass} font-medium flex items-center justify-center gap-1">
+                                    <i class="ph-bold ${iconClass}"></i> ${changeStr} (${((diff/lastPrice)*100).toFixed(2)}%)
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="max-w-xl mx-auto bg-blue-900/10 border border-blue-500/20 p-4 rounded-xl mb-8">
+                            <p class="text-sm text-slate-300 italic">
+                                "Based on the uploaded historical stock data, the selected <strong>${modelName}</strong> model predicts a 
+                                <span class="${colorClass} font-semibold">${isUp ? 'slight increase' : 'slight decrease'}</span> 
+                                in the next trading day's closing price. This prediction is intended for educational purposes only."
+                            </p>
+                        </div>
+                        
+                        <div class="bg-dark-bg/50 p-4 rounded-xl border border-dark-border">
+                            <div id="livePredictionChart" class="w-full h-[350px]"></div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            resultsSection.classList.remove('hidden');
+            renderLiveChart(historicalData, preds, model);
+            
+            // Scroll to results
+            setTimeout(() => {
+                resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
+        }
+
+        function renderLiveChart(historical, preds, selectedModel) {
+            if (state.liveChartInstance) {
+                state.liveChartInstance.destroy();
+            }
+
+            const lastPoint = historical[historical.length - 1];
+            const nextDate = lastPoint.x + 86400000; // +1 day
+
+            const series = [{ name: 'Actual close', data: historical }];
+            const colors = ['#ffffff']; // White line for actual in dark mode
+            const dashArrays = [0]; // Solid line
+            const markerSizes = [4];
+
+            // Always add naive baseline
+            series.push({
+                name: 'Naive (no skill)',
+                data: [{x: lastPoint.x, y: lastPoint.y}, {x: nextDate, y: lastPoint.y}]
+            });
+            colors.push('#9ca3af'); // Gray
+            dashArrays.push(5);
+            markerSizes.push(8);
+
+            if (selectedModel === 'all' || selectedModel === 'lag') {
+                series.push({
+                    name: 'Lag-Informed Regression ⚠',
+                    data: [{x: lastPoint.x, y: lastPoint.y}, {x: nextDate, y: preds.lag}]
+                });
+                colors.push('#3b82f6'); // Blue
+                dashArrays.push(5);
+                markerSizes.push(8);
+            }
+            
+            if (selectedModel === 'all' || selectedModel === 'arima') {
+                series.push({
+                    name: 'ARIMA ⚠',
+                    data: [{x: lastPoint.x, y: lastPoint.y}, {x: nextDate, y: preds.arima}]
+                });
+                colors.push('#8b5cf6'); // Purple
+                dashArrays.push(5);
+                markerSizes.push(8);
+            }
+            
+            if (selectedModel === 'all' || selectedModel === 'lstm') {
+                series.push({
+                    name: 'LSTM ✓',
+                    data: [{x: lastPoint.x, y: lastPoint.y}, {x: nextDate, y: preds.lstm}]
+                });
+                colors.push('#f97316'); // Orange
+                dashArrays.push(5);
+                markerSizes.push(8);
+            }
+
+            const options = {
+                series: series,
+                chart: {
+                    height: 350,
+                    type: 'line',
+                    background: 'transparent',
+                    toolbar: { show: false },
+                    animations: { enabled: true, easing: 'easeinout', speed: 800 }
+                },
+                theme: { mode: 'dark' },
+                colors: colors,
+                stroke: {
+                    curve: 'straight',
+                    width: [2, 2, 2, 2, 2],
+                    dashArray: dashArrays
+                },
+                markers: {
+                    size: markerSizes,
+                    strokeWidth: 0,
+                    hover: { sizeOffset: 2 }
+                },
+                title: {
+                    text: '',
+                    align: 'center',
+                    style: { color: '#ef4444', fontSize: '10px', fontWeight: 'bold', cssClass: 'apexcharts-subtitle-text', opacity: 0.2 }
+                },
+                xaxis: {
+                    type: 'datetime',
+                    labels: { style: { colors: '#94a3b8' } },
+                    axisBorder: { color: '#334155' }
+                },
+                yaxis: {
+                    labels: {
+                        style: { colors: '#94a3b8' },
+                        formatter: (value) => value.toFixed(0)
+                    }
+                },
+                grid: { borderColor: '#1e293b', strokeDashArray: 4 },
+                legend: { position: 'top', horizontalAlign: 'center', labels: { colors: '#cbd5e1' }, itemMargin: { horizontal: 10, vertical: 5 } }
+            };
+
+            state.liveChartInstance = new ApexCharts(document.querySelector("#livePredictionChart"), options);
+            state.liveChartInstance.render();
+            state.chartInstances.push(state.liveChartInstance);
+        }
+
+        function resetLivePrediction() {
+            if (state.liveChartInstance) {
+                state.liveChartInstance.destroy();
+                state.liveChartInstance = null;
+            }
+            document.getElementById('uploadSection').classList.remove('hidden');
+            document.getElementById('processingSection').classList.add('hidden');
+            document.getElementById('predictionSetupSection').classList.add('hidden');
+            document.getElementById('finalResultsSection').classList.add('hidden');
+            document.getElementById('finalResultsSection').innerHTML = '';
+            document.getElementById('fileInput').value = ''; // clear file
+        }
+
+        // --- STREAMING_CHUNK:Rendering Educational Hub (Learn Stocks) ---
+        function renderLearn() {
+            return `
+                <div class="animate-[fadeIn_0.3s_ease-out] max-w-5xl mx-auto">
+                    <div class="text-center mb-12">
+                        <h1 class="text-4xl font-bold text-white tracking-tight mb-4">Understanding the Forecasts</h1>
+                        <p class="text-lg text-slate-400 max-w-2xl mx-auto">A beginner-friendly guide to the data, models, and metrics used in this capstone research.</p>
+                    </div>
+
+                    <div class="space-y-8">
+                        <!-- Data Fundamentals -->
+                        <div class="bg-dark-card border border-dark-border rounded-3xl p-8 md:p-10 relative overflow-hidden">
+                            <div class="absolute right-0 bottom-0 opacity-5 p-4"><i class="ph-fill ph-database text-[15rem]"></i></div>
+                            <div class="relative z-10">
+                                <h2 class="text-2xl font-bold text-brand-400 mb-4 flex items-center gap-2"><i class="ph-fill ph-table"></i> What is OHLCV?</h2>
+                                <p class="text-slate-300 leading-relaxed mb-6">
+                                    Before we can forecast the future, we have to look at the past. Our models learn purely from numerical historical data, which are the basic building blocks of daily stock market records. We do not use news sentiment, rumors, or economic indicators.
+                                </p>
+                                
+                                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
+                                    <div class="bg-dark-bg p-4 rounded-xl border border-dark-border text-center">
+                                        <div class="text-brand-400 font-bold text-xl mb-1">O</div>
+                                        <div class="text-white text-sm font-semibold">Open</div>
+                                        <div class="text-xs text-slate-500 mt-1">Price when market opens.</div>
+                                    </div>
+                                    <div class="bg-dark-bg p-4 rounded-xl border border-dark-border text-center">
+                                        <div class="text-green-400 font-bold text-xl mb-1">H</div>
+                                        <div class="text-white text-sm font-semibold">High</div>
+                                        <div class="text-xs text-slate-500 mt-1">Highest price of the day.</div>
+                                    </div>
+                                    <div class="bg-dark-bg p-4 rounded-xl border border-dark-border text-center">
+                                        <div class="text-red-400 font-bold text-xl mb-1">L</div>
+                                        <div class="text-white text-sm font-semibold">Low</div>
+                                        <div class="text-xs text-slate-500 mt-1">Lowest price of the day.</div>
+                                    </div>
+                                    <div class="bg-brand-900/40 p-4 rounded-xl border border-brand-500/50 text-center shadow-[0_0_15px_rgba(59,130,246,0.1)] relative">
+                                        <div class="absolute -top-2 -right-2 bg-brand-500 text-[9px] font-bold text-white px-2 py-0.5 rounded">TARGET</div>
+                                        <div class="text-brand-300 font-bold text-xl mb-1">C</div>
+                                        <div class="text-white text-sm font-semibold">Close</div>
+                                        <div class="text-xs text-slate-400 mt-1">Final price. What we predict.</div>
+                                    </div>
+                                    <div class="bg-dark-bg p-4 rounded-xl border border-dark-border text-center">
+                                        <div class="text-purple-400 font-bold text-xl mb-1">V</div>
+                                        <div class="text-white text-sm font-semibold">Volume</div>
+                                        <div class="text-xs text-slate-500 mt-1">Total shares traded.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Models Section -->
+                        <h2 class="text-2xl font-bold text-white text-center mt-12 mb-6">The Forecasting Models</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            
+                            <!-- Model 1 -->
+                            <div class="bg-dark-card border border-dark-border rounded-2xl p-6 hover:-translate-y-1 transition-transform">
+                                <div class="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center text-slate-300 mb-4 border border-slate-700">
+                                    <i class="ph-bold ph-calculator text-2xl"></i>
+                                </div>
+                                <h3 class="text-xl font-bold text-white mb-1">Lag Regression</h3>
+                                <p class="text-sm font-medium text-slate-400 mb-4">"The Pattern Spotter"</p>
+                                <p class="text-sm text-slate-300 leading-relaxed">
+                                    An interpretable machine learning model. It studies recent historical prices and trading volumes, uses PACF to identify meaningful lag relationships (patterns repeating over days), and LASSO regularization to retain only the strongest predictors.
+                                </p>
+                            </div>
+
+                            <!-- Model 2 -->
+                            <div class="bg-dark-card border border-dark-border rounded-2xl p-6 hover:-translate-y-1 transition-transform">
+                                <div class="w-12 h-12 bg-blue-900/30 rounded-xl flex items-center justify-center text-blue-400 mb-4 border border-blue-900">
+                                    <i class="ph-bold ph-chart-line-up text-2xl"></i>
+                                </div>
+                                <h3 class="text-xl font-bold text-white mb-1">ARIMA</h3>
+                                <p class="text-sm font-medium text-blue-400 mb-4">"The Trend Tracker"</p>
+                                <p class="text-sm text-slate-300 leading-relaxed">
+                                    A traditional statistical time-series standard. It analyzes historical closing prices, underlying trends, differencing (to stabilize data), and past forecasting errors to mathematically estimate the next day's closing price.
+                                </p>
+                            </div>
+
+                            <!-- Model 3 -->
+                            <div class="bg-dark-card border border-brand-500/50 rounded-2xl p-6 hover:-translate-y-1 transition-transform shadow-[0_0_20px_rgba(59,130,246,0.1)] relative overflow-hidden">
+                                <div class="absolute top-0 right-0 bg-brand-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl">DEEP LEARNING</div>
+                                <div class="w-12 h-12 bg-brand-900/50 rounded-xl flex items-center justify-center text-brand-300 mb-4 border border-brand-500/50">
+                                    <i class="ph-bold ph-brain text-2xl"></i>
+                                </div>
+                                <h3 class="text-xl font-bold text-white mb-1">LSTM</h3>
+                                <p class="text-sm font-medium text-brand-400 mb-4">"The Deep Thinker"</p>
+                                <p class="text-sm text-slate-300 leading-relaxed">
+                                    A deep learning recurrent neural network. Long Short-Term Memory (LSTM) studies sequences of historical prices. It explicitly learns to "remember" important long-term patterns and "forget" irrelevant noise to generate forecasts.
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Metrics Section -->
+                        <div class="pt-8">
+                            <h2 class="text-2xl font-bold text-white text-center mb-4">The Metrics: How Do We Know if a Model is Good?</h2>
+                            <p class="text-slate-400 text-center max-w-3xl mx-auto mb-8 text-sm leading-relaxed">
+                                When you look at the Model Performance page, you will see a few different scores. We use these to grade the models by comparing what the model predicted against what the stock's price actually was on that day.
+                            </p>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <!-- RMSE -->
+                                <div class="bg-dark-card border border-dark-border rounded-2xl p-6 hover:border-blue-500/50 transition-colors">
+                                    <h3 class="text-lg font-bold text-blue-400 mb-1">RMSE (Root Mean Squared Error)</h3>
+                                    <p class="text-sm font-medium text-white mb-3">Our Main Grading Score</p>
+                                    <p class="text-sm text-slate-400 leading-relaxed mb-4">Think of this as the average prediction error in raw Pesos, but it heavily penalizes huge misses. If a model gets most days right but is completely wrong on one day, its RMSE will look bad.</p>
+                                    <div class="inline-block px-3 py-1 bg-green-500/10 text-green-400 border border-green-500/20 rounded text-xs font-bold uppercase tracking-wider">Lower is better</div>
+                                </div>
+
+                                <!-- MAE -->
+                                <div class="bg-dark-card border border-dark-border rounded-2xl p-6 hover:border-green-500/50 transition-colors">
+                                    <h3 class="text-lg font-bold text-green-400 mb-1">MAE (Mean Absolute Error)</h3>
+                                    <p class="text-sm font-medium text-white mb-3">The Average Miss</p>
+                                    <p class="text-sm text-slate-400 leading-relaxed mb-4">This is simply the average difference between the predicted price and the actual price in Pesos. If the MAE is ₱2.00, it means the model's forecasts were off by an average of 2 Pesos.</p>
+                                    <div class="inline-block px-3 py-1 bg-green-500/10 text-green-400 border border-green-500/20 rounded text-xs font-bold uppercase tracking-wider">Lower is better</div>
+                                </div>
+
+                                <!-- MAPE -->
+                                <div class="bg-dark-card border border-dark-border rounded-2xl p-6 hover:border-yellow-500/50 transition-colors">
+                                    <h3 class="text-lg font-bold text-yellow-400 mb-1">MAPE (Mean Absolute Percentage Error)</h3>
+                                    <p class="text-sm font-medium text-white mb-3">The Percentage Miss</p>
+                                    <p class="text-sm text-slate-400 leading-relaxed mb-4">This tells us how far off the prediction was as a percentage. If a stock costs ₱1,000 and the model is off by ₱10, that’s a 1% error. This metric is perfect for comparing different stocks against each other, regardless of how expensive their shares are.</p>
+                                    <div class="inline-block px-3 py-1 bg-green-500/10 text-green-400 border border-green-500/20 rounded text-xs font-bold uppercase tracking-wider">Lower is better</div>
+                                </div>
+
+                                <!-- R2 -->
+                                <div class="bg-dark-card border border-dark-border rounded-2xl p-6 hover:border-purple-500/50 transition-colors">
+                                    <h3 class="text-lg font-bold text-purple-400 mb-1">R² (R-squared)</h3>
+                                    <p class="text-sm font-medium text-white mb-3">The Explanation Score</p>
+                                    <p class="text-sm text-slate-400 leading-relaxed mb-4">This tells us what percentage of the stock's actual movement the model successfully captured. Higher is better (a score closer to 1.0 or 100% means the model fits the data very well).</p>
+                                    <div class="inline-block px-3 py-1 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded text-xs font-bold uppercase tracking-wider">Higher is better</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Warning -->
+                        <div class="mt-12 bg-red-950/30 border border-red-900/50 rounded-2xl p-6 flex flex-col sm:flex-row items-center sm:items-start gap-4">
+                            <i class="ph-fill ph-warning-octagon text-red-500 text-4xl mt-1 shrink-0"></i>
+                            <div>
+                                <h3 class="text-lg font-bold text-red-400 mb-2">Forecasts Are Not Financial Advice</h3>
+                                <p class="text-sm text-slate-300 leading-relaxed">
+                                    These models look only at numerical history. Real stock prices are violently affected by breaking news, economic reports (inflation, interest rates), corporate earnings surprises, natural disasters, and irrational human sentiment—none of which are captured by OHLCV data alone. Use this tool to learn about data analytics, not to risk real money.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- STREAMING_CHUNK:Rendering About the Study Page ---
+        function renderAbout() {
+            return `
+                <div class="max-w-4xl mx-auto animate-[fadeIn_0.3s_ease-out]">
+                    <!-- Header -->
+                    <div class="text-center mb-12">
+                        <h1 class="text-4xl font-bold text-white tracking-tight mb-4">About the Research</h1>
+                        <p class="text-lg text-slate-400">BSIT Data Analytics Capstone Project Overview</p>
+                    </div>
+
+                    <div class="space-y-8">
+                        <!-- Abstract/Overview -->
+                        <section class="bg-dark-card border border-dark-border rounded-2xl p-8">
+                            <h2 class="text-2xl font-bold text-white mb-4 border-b border-dark-border pb-2">Project Overview</h2>
+                            
+                            <h3 class="text-lg font-semibold text-brand-400 mt-6 mb-2">The Problem</h3>
+                            <p class="text-slate-300 leading-relaxed text-sm mb-6">
+                                Existing local studies on Philippine stock forecasting often focus on a single model or only track market indices. Furthermore, the outputs are usually code-heavy and difficult for non-programmers to interpret. There is also a lack of comparative analysis to prove which model architecture works best for specific industries, as no single forecasting model performs perfectly across all market conditions.
+                            </p>
+
+                            <h3 class="text-lg font-semibold text-brand-400 mb-2">How the System Works</h3>
+                            <p class="text-slate-300 leading-relaxed text-sm">
+                                Historical OHLCV data (Open, High, Low, Close, Volume) spanning several years are sourced primarily from official PSE EDGE records for accuracy. The data is carefully cleaned, preprocessed (scaling, lag feature generation), and chronologically split (70% Training, 15% Validation, 15% Test) to completely prevent "data leakage" (looking into the future during training). Three distinct models—Lag-Informed Regression, ARIMA, and LSTM—are then developed, trained, and evaluated under these exact same conditions. Finally, this web dashboard was built to visualize the results interactively.
+                            </p>
+                        </section>
+
+                        <!-- Methodology -->
+                        <section class="bg-dark-card border border-dark-border rounded-2xl p-8">
+                            <h2 class="text-2xl font-bold text-white mb-4 border-b border-dark-border pb-2">Methodology & Evaluation</h2>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mt-6">
+                                <div>
+                                    <h3 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Target Users</h3>
+                                    <ul class="space-y-2 text-slate-300 text-sm">
+                                        <li class="flex items-center gap-2"><i class="ph-bold ph-check text-brand-500"></i> Budding Traders (Primary Users)</li>
+                                        <li class="flex items-center gap-2"><i class="ph-bold ph-check text-brand-500"></i> Students and Learning Users</li>
+                                        <li class="flex items-center gap-2"><i class="ph-bold ph-check text-brand-500"></i> Researchers and Data Analytics Developers</li>
+                                        <li class="flex items-center gap-2"><i class="ph-bold ph-check text-brand-500"></i> Academic Community</li>
+                                        <li class="flex items-center gap-2"><i class="ph-bold ph-check text-brand-500"></i> Future Researchers</li>
+                                    </ul>
+                                </div>
+                                <div>
+                                    <h3 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3">Statistical Rigor</h3>
+                                    <p class="text-slate-300 leading-relaxed text-sm mb-3">
+                                        RMSE (Root Mean Square Error) serves as the primary evaluation metric due to its sensitivity to large errors.
+                                    </p>
+                                    <p class="text-slate-300 leading-relaxed text-sm bg-dark-bg p-3 rounded-lg border border-dark-border">
+                                        <strong class="text-white">Significance Testing:</strong> To ensure that the performance differences between models (Lag Reg vs ARIMA vs LSTM) are not just due to random chance, <strong>Friedman and Wilcoxon statistical tests</strong> are applied to the error distributions.
+                                    </p>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Final Disclaimer -->
+                        <section class="bg-gradient-to-br from-dark-card to-dark-bg border border-dark-border rounded-2xl p-8 text-center relative overflow-hidden">
+                            <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-brand-500 to-transparent"></div>
+                            <h2 class="text-xl font-bold text-white mb-4">Responsible Use Disclaimer</h2>
+                            <p class="text-slate-400 text-sm leading-relaxed max-w-3xl mx-auto">
+                                This dashboard is strictly an <strong>educational and analytical decision-support tool</strong>. It relies solely on historical market data and does not account for breaking news, economic shocks, geopolitical events, or unexpected market anomalies. The forecasts, model rankings, and insights provided do not constitute financial advice, buy-or-sell recommendations, automated trading signals, or guaranteed investment outcomes. Users should conduct their own research and consult qualified financial professionals before making investment decisions.
+                            </p>
+                        </section>
+                    </div>
+                </div>
+            `;
+        }
+
+
+        // --- STREAMING_CHUNK:Initialization and Event Listeners ---
+        // Initialize App
+        document.addEventListener('DOMContentLoaded', () => {
+            // Setup Tailwind config dynamically just in case
+            document.documentElement.classList.add('dark');
+            
+            // Load initial view — mirrors whichever tab the top-level Streamlit
+            // page's ?page= param says is active (set by app.py into APP_DATA).
+            renderView(window.APP_DATA.activePage || 'home');
+        });
+
+    </script>
+</body>
+</html>

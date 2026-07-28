@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>CSV Uploader</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web"></script>
+<style>
+  :root {
+    --brand-400: #60a5fa;
+    --brand-500: #3b82f6;
+    --brand-600: #2563eb;
+    --dark-bg: #0f172a;
+    --dark-card: #1e293b;
+    --dark-border: #334155;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    font-family: 'Inter', sans-serif;
+    color: #cbd5e1; /* slate-300 */
+  }
+  #card {
+    background: var(--dark-card);
+    border: 1px solid var(--dark-border);
+    border-radius: 1rem;
+    padding: 1.75rem;
+    box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3);
+  }
+  #dropZone {
+    border: 2px dashed var(--dark-border);
+    border-radius: 0.75rem;
+    padding: 2.25rem 1.5rem;
+    background: rgba(15, 23, 42, 0.5);
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  #dropZone.drag-over {
+    border-color: var(--brand-500);
+    background: rgba(59, 130, 246, 0.08);
+  }
+  #dropZone.has-error {
+    border-color: #f87171;
+  }
+  .icon-circle {
+    width: 4rem;
+    height: 4rem;
+    border-radius: 9999px;
+    background: rgba(59, 130, 246, 0.1);
+    color: var(--brand-400);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1rem auto;
+    font-size: 1.75rem;
+  }
+  .icon-circle.success { background: rgba(74, 222, 128, 0.1); color: #4ade80; }
+  .icon-circle.error { background: rgba(248, 113, 113, 0.1); color: #f87171; }
+  h3 {
+    color: #ffffff;
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin: 0 0 0.35rem 0;
+  }
+  p.hint {
+    color: #94a3b8; /* slate-400 */
+    font-size: 0.85rem;
+    margin: 0 0 0.5rem 0;
+    line-height: 1.4;
+  }
+  .cols-note {
+    margin-top: 1.25rem;
+    text-align: center;
+    font-size: 0.8rem;
+    color: #64748b; /* slate-500 */
+  }
+  .cols-note code {
+    background: var(--dark-bg);
+    color: #cbd5e1;
+    padding: 0.1rem 0.35rem;
+    border-radius: 0.25rem;
+    font-family: monospace;
+  }
+  .footer-row {
+    margin-top: 1.25rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+  .filename {
+    font-size: 0.85rem;
+    color: #e2e8f0;
+    font-weight: 500;
+  }
+  button.link-btn {
+    background: none;
+    border: none;
+    color: #94a3b8;
+    font-size: 0.8rem;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 0;
+  }
+  button.link-btn:hover { color: #ffffff; }
+  .error-text {
+    color: #fca5a5;
+    font-size: 0.85rem;
+    margin-top: 0.5rem;
+  }
+  #fileInput { display: none; }
+  .spinner {
+    display: inline-block;
+    width: 1.75rem;
+    height: 1.75rem;
+    border: 2px solid rgba(96, 165, 250, 0.25);
+    border-top-color: var(--brand-400);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+  <div id="card">
+    <div id="dropZone">
+      <div class="icon-circle" id="iconCircle"><i class="ph ph-upload-simple"></i></div>
+      <h3 id="statusTitle">Drag & drop your OHLCV CSV here</h3>
+      <p class="hint" id="statusHint">or click to browse from your computer</p>
+      <input type="file" id="fileInput" accept=".csv" />
+    </div>
+    <div class="cols-note">Required columns: <code>Date, Open, High, Low, Close, Volume</code></div>
+    <div class="footer-row" id="footerRow" style="display:none;">
+      <span class="filename" id="filenameLabel"></span>
+      <button class="link-btn" id="resetBtn" type="button">Upload a different file</button>
+    </div>
+  </div>
+
+<script>
+  // --- Minimal vanilla-JS implementation of Streamlit's bidirectional
+  // component postMessage protocol (no build step / no npm dependency). ---
+  function sendToStreamlit(type, data) {
+    var payload = Object.assign({ isStreamlitMessage: true, type: type }, data || {});
+    window.parent.postMessage(payload, "*");
+  }
+  function notifyReady() {
+    sendToStreamlit("streamlit:componentReady", { apiVersion: 1 });
+  }
+  function setFrameHeight() {
+    var h = document.documentElement.scrollHeight;
+    sendToStreamlit("streamlit:setFrameHeight", { height: h });
+  }
+  function setValue(value) {
+    sendToStreamlit("streamlit:setComponentValue", { value: value, dataType: "json" });
+  }
+  window.addEventListener("message", function (event) {
+    if (!event.data || event.data.type !== "streamlit:render") return;
+    // No props are currently consumed from Python; the component is self-contained.
+  });
+
+  // --- Upload UI logic ---
+  var dropZone = document.getElementById("dropZone");
+  var fileInput = document.getElementById("fileInput");
+  var iconCircle = document.getElementById("iconCircle");
+  var statusTitle = document.getElementById("statusTitle");
+  var statusHint = document.getElementById("statusHint");
+  var footerRow = document.getElementById("footerRow");
+  var filenameLabel = document.getElementById("filenameLabel");
+  var resetBtn = document.getElementById("resetBtn");
+
+  function resetUI() {
+    dropZone.classList.remove("has-error");
+    iconCircle.className = "icon-circle";
+    iconCircle.innerHTML = '<i class="ph ph-upload-simple"></i>';
+    statusTitle.textContent = "Drag & drop your OHLCV CSV here";
+    statusHint.textContent = "or click to browse from your computer";
+    footerRow.style.display = "none";
+    fileInput.value = "";
+    setValue(null);
+    setTimeout(setFrameHeight, 0);
+  }
+
+  function showError(message) {
+    dropZone.classList.add("has-error");
+    iconCircle.className = "icon-circle error";
+    iconCircle.innerHTML = '<i class="ph ph-warning-circle"></i>';
+    statusTitle.textContent = "Couldn't read that file";
+    statusHint.innerHTML = '<span class="error-text">' + message + "</span>";
+    footerRow.style.display = "flex";
+    filenameLabel.textContent = "";
+    setTimeout(setFrameHeight, 0);
+  }
+
+  function showLoading(name) {
+    dropZone.classList.remove("has-error");
+    iconCircle.className = "icon-circle";
+    iconCircle.innerHTML = '<span class="spinner"></span>';
+    statusTitle.textContent = "Reading " + name + "…";
+    statusHint.textContent = "This only takes a moment.";
+    footerRow.style.display = "none";
+    setTimeout(setFrameHeight, 0);
+  }
+
+  function showSuccess(name) {
+    dropZone.classList.remove("has-error");
+    iconCircle.className = "icon-circle success";
+    iconCircle.innerHTML = '<i class="ph ph-check-circle"></i>';
+    statusTitle.textContent = "File ready";
+    statusHint.textContent = "Sent to the forecasting models below.";
+    footerRow.style.display = "flex";
+    filenameLabel.textContent = name;
+    setTimeout(setFrameHeight, 0);
+  }
+
+  function handleFile(file) {
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      showError("Please upload a .csv file.");
+      return;
+    }
+    showLoading(file.name);
+    var reader = new FileReader();
+    reader.onload = function () {
+      showSuccess(file.name);
+      setValue({ name: file.name, content: reader.result });
+    };
+    reader.onerror = function () {
+      showError("The file could not be read.");
+    };
+    reader.readAsText(file);
+  }
+
+  dropZone.addEventListener("click", function () { fileInput.click(); });
+  fileInput.addEventListener("change", function (e) {
+    handleFile(e.target.files && e.target.files[0]);
+  });
+  dropZone.addEventListener("dragover", function (e) {
+    e.preventDefault();
+    dropZone.classList.add("drag-over");
+  });
+  dropZone.addEventListener("dragleave", function () {
+    dropZone.classList.remove("drag-over");
+  });
+  dropZone.addEventListener("drop", function (e) {
+    e.preventDefault();
+    dropZone.classList.remove("drag-over");
+    var file = e.dataTransfer.files && e.dataTransfer.files[0];
+    handleFile(file);
+  });
+  resetBtn.addEventListener("click", function (e) {
+    e.stopPropagation();
+    resetUI();
+  });
+
+  window.addEventListener("resize", setFrameHeight);
+
+  notifyReady();
+  setValue(null);
+  setTimeout(setFrameHeight, 0);
+</script>
+</body>
+</html>

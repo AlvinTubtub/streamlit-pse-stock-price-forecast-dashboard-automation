@@ -1,0 +1,119 @@
+name: Update PSE Market Data
+
+# Runs every Philippine trading day at approximately 6:30 PM PHT (UTC+8,
+# no DST), which is 10:30 UTC — after PSE's end-of-day disclosures are
+# published. Also runnable on demand from the Actions tab.
+on:
+  schedule:
+    - cron: "30 10 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      start_date:
+        description: "Optional start date override (YYYY-MM-DD)"
+        required: false
+        type: string
+      end_date:
+        description: "Optional end date override (YYYY-MM-DD)"
+        required: false
+        type: string
+
+# Least privilege: this job only ever reads the repo and, if data changed,
+# pushes a commit back to it.
+permissions:
+  contents: write
+
+concurrency:
+  group: update-pse-data
+  cancel-in-progress: false
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements-pipeline.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: pip install -r requirements-pipeline.txt
+
+      - name: Run pipeline
+        id: pipeline
+        run: |
+          ARGS=""
+          if [ -n "${{ github.event.inputs.start_date }}" ]; then
+            ARGS="$ARGS --start-date ${{ github.event.inputs.start_date }}"
+          fi
+          if [ -n "${{ github.event.inputs.end_date }}" ]; then
+            ARGS="$ARGS --end-date ${{ github.event.inputs.end_date }}"
+          fi
+          python run_pipeline.py $ARGS
+
+      - name: Verify generated CSVs exist
+        run: |
+          shopt -s nullglob
+          files=(data/raw/*.csv)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::error::No CSV files found in data/raw/ — pipeline did not produce expected output."
+            exit 1
+          fi
+          echo "Found ${#files[@]} CSV file(s) in data/raw/:"
+          for f in "${files[@]}"; do
+            lines=$(wc -l < "$f")
+            echo "  $f ($lines lines)"
+            if [ "$lines" -lt 2 ]; then
+              echo "::error::$f looks empty (only $lines line(s))."
+              exit 1
+            fi
+          done
+
+      - name: Check for changes
+        id: changes
+        run: |
+          git add -A data/raw
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No changes to data/raw/ — nothing to commit."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Changes detected in data/raw/:"
+            git diff --cached --stat
+          fi
+
+      - name: Commit and push updated CSVs
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          TZ: Asia/Manila
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -m "Auto-update PSE data ($(date +%Y-%m-%d))"
+          git push
+
+      - name: Skip commit (no changes)
+        if: steps.changes.outputs.changed == 'false'
+        run: echo "Data is already up to date — skipping commit to avoid an empty commit."
+
+      - name: Upload pipeline log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-log
+          path: data/pdf_pipeline/pipeline.log
+          if-no-files-found: ignore
+          retention-days: 14
