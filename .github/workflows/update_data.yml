@@ -1,11 +1,14 @@
 name: Update PSE Market Data
 
-# Runs every Philippine trading day at approximately 6:30 PM PHT (UTC+8,
-# no DST), which is 10:30 UTC — after PSE's end-of-day disclosures are
-# published. Also runnable on demand from the Actions tab.
+# Runs daily at 3:00 PM, 4:00 PM, and 5:00 PM PHT (UTC+8, no DST) — i.e.
+# 07:00, 08:00, 09:00 UTC — so a report that publishes late in one run is
+# picked up by the next one that same afternoon. Also runnable on demand
+# from the Actions tab.
 on:
   schedule:
-    - cron: "30 10 * * 1-5"
+    - cron: "0 7 * * *"
+    - cron: "0 8 * * *"
+    - cron: "0 9 * * *"
   workflow_dispatch:
     inputs:
       start_date:
