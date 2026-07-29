@@ -102,7 +102,7 @@ def train(df: pd.DataFrame):
         # Fallback: naive-ish drift model, so the app still runs in
         # environments without statsmodels installed.
         y_pred = train_series.iloc[-1] + np.cumsum(np.full(len(test_series), train_series.diff().mean()))
-        metrics = compute_metrics(test_series.values, y_pred)
+        metrics = compute_metrics(test_series.values, y_pred, y_train=train_series.values)
         next_close = float(close.iloc[-1] + train_series.diff().mean())
         backtest = close.shift(1).bfill().tolist()
         return None, DEFAULT_ORDER, metrics, next_close, backtest
@@ -112,7 +112,7 @@ def train(df: pd.DataFrame):
 
     model = ARIMA(train_series, order=order).fit()
     forecast = model.forecast(steps=n_test)
-    metrics = compute_metrics(test_series.values, forecast.values)
+    metrics = compute_metrics(test_series.values, forecast.values, y_train=train_series.values)
 
     full_model = ARIMA(close, order=order).fit()
     next_close = float(full_model.forecast(steps=1).iloc[0])

@@ -67,7 +67,7 @@ def train(df: pd.DataFrame) -> tuple[LagRegressionArtifact, dict, float, list[fl
 
     model = LinearRegression().fit(X_train_scaled[:, sel_idx], train_df["target"])
     test_pred = model.predict(X_test_scaled[:, sel_idx])
-    metrics = compute_metrics(test_df["target"].values, test_pred)
+    metrics = compute_metrics(test_df["target"].values, test_pred, y_train=train_df["target"].values)
 
     # Refit on all available rows so the persisted model (and the next-day
     # forecast) uses the most recent data too.

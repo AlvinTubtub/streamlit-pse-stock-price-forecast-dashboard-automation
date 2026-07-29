@@ -1,7 +1,7 @@
 """Shared model-evaluation utilities.
 
 One metrics implementation used by every forecasting model (Lag-Informed
-Regression, ARIMA, LSTM) and by the naive baseline, so RMSE/MAE/MAPE/R²
+Regression, ARIMA, LSTM) and by the naive baseline, so RMSE/MAE/MASE/R²
 are always computed the same way regardless of which model produced the
 predictions.
 """
@@ -16,32 +16,36 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 log = logging.getLogger(__name__)
 
 
-def _naive_mae(y_true: np.ndarray) -> float:
-    """Denominator for MASE: the mean absolute error of a naive one-step
-    (yesterday's value) forecast over the same series."""
-    y_true = np.asarray(y_true, dtype=float)
-    if len(y_true) < 2:
+def _naive_mae(y_reference: np.ndarray) -> float:
+    """The mean absolute error of a naive one-step (yesterday's value)
+    forecast, computed over ``y_reference`` — this is the MASE scaling
+    denominator. Per Hyndman & Koehler, this should be the *in-sample*
+    (training) series, not the held-out series being scored, so that the
+    denominator reflects how hard the series is to forecast naively
+    independent of the test window.
+    """
+    y_reference = np.asarray(y_reference, dtype=float)
+    if len(y_reference) < 2:
         return 1e-8
-    return float(np.mean(np.abs(np.diff(y_true)))) or 1e-8
+    return float(np.mean(np.abs(np.diff(y_reference)))) or 1e-8
 
 
-def compute_metrics(y_true, y_pred) -> dict:
-    """RMSE, MAE, MAPE, R² (plus MASE, kept for the existing dashboard's
-    "vs. naive" comparisons) — the four headline metrics requested by the
-    capstone methodology, all as formatted strings for direct display.
+def compute_metrics(y_true, y_pred, y_train=None) -> dict:
+    """RMSE, MAE, MASE, R² — the four headline metrics used across the
+    project, all as formatted strings for direct display.
+
+    ``y_train`` should be the in-sample (training) target series, used as
+    the naive one-step-forecast baseline that scales MASE. When omitted
+    (e.g. the naive baseline scoring itself), ``y_true`` is used instead.
     """
     y_true = np.asarray(y_true, dtype=float)
     y_pred = np.asarray(y_pred, dtype=float)
 
     rmse = float(np.sqrt(mean_squared_error(y_true, y_pred)))
     mae = float(mean_absolute_error(y_true, y_pred))
-    mase = mae / _naive_mae(y_true)
 
-    nonzero = y_true != 0
-    if nonzero.any():
-        mape = float(np.mean(np.abs((y_true[nonzero] - y_pred[nonzero]) / y_true[nonzero])) * 100)
-    else:
-        mape = 0.0
+    naive_reference = y_true if y_train is None else np.asarray(y_train, dtype=float)
+    mase = mae / _naive_mae(naive_reference)
 
     r2 = float(r2_score(y_true, y_pred)) if len(y_true) > 1 else 0.0
 
@@ -49,7 +53,6 @@ def compute_metrics(y_true, y_pred) -> dict:
         "rmse": f"{rmse:.4f}",
         "mae": f"{mae:.4f}",
         "mase": f"{mase:.4f}",
-        "mape": f"{mape:.4f}",
         "r2": f"{r2:.4f}",
     }
 
@@ -73,7 +76,7 @@ def build_comparison_table(metrics_by_model: dict[str, dict], labels: dict[str, 
             "Model": labels.get(key, key),
             "RMSE": float(metrics["rmse"]),
             "MAE": float(metrics["mae"]),
-            "MAPE": float(metrics["mape"]),
+            "MASE": float(metrics["mase"]),
             "R2": float(metrics["r2"]),
         })
     table = pd.DataFrame(rows).sort_values("RMSE").reset_index(drop=True)

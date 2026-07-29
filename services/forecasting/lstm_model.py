@@ -169,7 +169,8 @@ def train(df: pd.DataFrame, seq_len: int = SEQ_LEN, epochs: int = 200, patience:
 
     test_pred = test_pred_norm * y_std + y_mean
     y_test_actual = y_test * y_std + y_mean
-    metrics = compute_metrics(y_test_actual, test_pred)
+    y_train_actual = y_train * y_std + y_mean
+    metrics = compute_metrics(y_test_actual, test_pred, y_train=y_train_actual)
 
     next_close = float(next_norm * y_std + y_mean)
 
