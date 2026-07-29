@@ -11,6 +11,7 @@ This repository is the fully Python-based version of the project. The previous H
 - Company details with historical charts
 - Model comparison across forecasting methods
 - **Update Data**: native PDF ingestion pipeline that fetches or accepts PSE EDGE End-of-Day quotation PDFs, extracts/cleans/validates OHLCV rows, and merges them into `data/raw/` — runs automatically via GitHub Actions on every trading day, or on demand from the app
+- **Automated model training + selection**: after every successful ingestion, all three forecasting models are retrained per ticker, evaluated (RMSE/MAE/MAPE/R²), saved to `models/`, and the lowest-RMSE model per ticker is recorded in `best_models.json` — see [Model Training Pipeline](#model-training-pipeline) below
 - Educational section explaining OHLCV and forecasting models
 - About page for project context and capstone background
 
@@ -22,9 +23,45 @@ This repository is the fully Python-based version of the project. The previous H
 - NumPy
 - Plotly
 - scikit-learn
-- Statsmodels
+- Statsmodels + pmdarima (automatic ARIMA order selection)
 - Torch
+- Joblib (model persistence)
 - pdfplumber, requests (PDF ingestion pipeline)
+
+## Model Training Pipeline
+
+Training is completely separate from the dashboard — Streamlit only loads
+already-trained models, it never fits anything itself.
+
+```text
+PSE EDGE PDF -> PDF Extraction -> CSV Generation -> Data Validation
+    -> Feature Engineering -> Model Training (x3) -> Model Evaluation
+    -> Best Model Selection -> Saved Models -> Streamlit Dashboard
+```
+
+- `services/feature_engineering.py` — lag features + technical indicators
+  (EMA 10/20, RSI 14, MACD/Signal, Bollinger Bands, daily return, rolling
+  volatility, High-Low and Open-Close spreads), shared by every model.
+- `services/forecasting/lag_regression.py` — StandardScaler -> LASSO
+  feature selection -> LinearRegression.
+- `services/forecasting/arima_model.py` — ADF stationarity test +
+  automatic (p, d, q) selection (via `pmdarima.auto_arima`, or an
+  AIC-ranked grid search fallback).
+- `services/forecasting/lstm_model.py` — multi-feature LSTM
+  (Open/High/Low/Close/Volume + indicators), sequence length 30,
+  chronological train/val/test split, early stopping, checkpointing.
+- `services/evaluation.py` — shared RMSE/MAE/MAPE/R² metrics.
+- `services/model_selector.py` — orchestrates training all three models
+  per ticker, saves them under `models/`, and writes `best_models.json`.
+
+Triggered automatically by `services/pdf_pipeline/pipeline.py` after every
+successful ingestion (both from the Streamlit "Update Data" page and from
+`run_pipeline.py` / the scheduled GitHub Action), or run directly:
+
+```bash
+python -m services.model_selector          # train + save models for every data/raw/*.csv
+python run_pipeline.py --no-train           # ingest new data only, skip retraining
+```
 
 ## Project Structure
 
@@ -57,6 +94,12 @@ pse-streamlit-2/
 │   │   └── SMPH.csv
 │   ├── pdf_reports/        # staged/uploaded PSE EDGE EOD PDFs (gitignored, except bundled samples)
 │   └── pdf_pipeline/       # intermediate ETL artifacts + pipeline.log (gitignored)
+├── models/                 # trained model artifacts (gitignored contents; structure tracked)
+│   ├── lag_regression/     # <TICKER>.pkl
+│   ├── arima/              # <TICKER>.pkl
+│   ├── lstm/                # <TICKER>.pth
+│   └── predictions/        # <TICKER>.json — cached metrics/predictions the dashboard loads
+├── best_models.json        # {"<TICKER>": "<best model label>"} per ticker, lowest RMSE
 ├── pages_app/
 │   ├── about.py
 │   ├── companies.py
@@ -68,8 +111,14 @@ pse-streamlit-2/
 ├── services/
 │   ├── data_loader.py
 │   ├── data_validator.py
-│   ├── feature_engineering.py
-│   ├── forecasting.py
+│   ├── feature_engineering.py   # lag + technical-indicator features, shared by all models
+│   ├── evaluation.py            # shared RMSE/MAE/MAPE/R² metrics
+│   ├── model_selector.py        # trains all 3 models per ticker, saves them, picks the best
+│   ├── forecasting/
+│   │   ├── __init__.py          # run_all_models() — legacy on-the-fly training, no persistence
+│   │   ├── lag_regression.py
+│   │   ├── arima_model.py
+│   │   └── lstm_model.py
 │   └── pdf_pipeline/       # PDF ingestion pipeline (download, parser, cleaner, validator, merge)
 │       ├── config.py
 │       ├── downloader.py
@@ -77,7 +126,7 @@ pse-streamlit-2/
 │       ├── cleaner.py
 │       ├── validator.py
 │       ├── merge.py
-│       └── pipeline.py
+│       └── pipeline.py     # calls services.model_selector after every successful merge
 ├── ui/
 └── legacy/
 ```
