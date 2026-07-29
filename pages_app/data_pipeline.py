@@ -1,9 +1,9 @@
 """Update Market Data page — native UI for the PDF ingestion pipeline.
 
-Lets the user either upload PSE EDGE EOD quotation PDFs directly, or fetch
-new ones automatically, then runs download -> extract -> clean -> validate
--> merge (services/pdf_pipeline) and refreshes the cached dashboard data so
-results show up immediately on the other pages.
+Lets the user fetch PSE EDGE EOD quotation PDFs automatically, or process
+whatever's already staged locally, then runs download -> extract -> clean
+-> validate -> merge (services/pdf_pipeline) and refreshes the cached
+dashboard data so results show up immediately on the other pages.
 """
 from __future__ import annotations
 
@@ -12,7 +12,6 @@ from datetime import date, timedelta
 import streamlit as st
 
 from services.pdf_pipeline import latest_raw_date, list_staged_pdfs, run_pipeline
-from services.pdf_pipeline.config import PDF_REPORTS_DIR
 from ui.components import card_close, card_open, section_header
 from ui.data import get_dashboard_data
 
@@ -21,7 +20,7 @@ def _show_result(result: dict) -> None:
     status = result["status"]
 
     if status == "no_files":
-        st.warning("No PDF reports to process — upload files or fetch new ones first.")
+        st.warning("No PDF reports to process — fetch new ones first.")
         return
     if status == "no_rows":
         st.error("PDFs were read, but no quotation rows could be extracted from them.")
@@ -98,7 +97,7 @@ def render() -> None:
     )
     card_close()
 
-    tab_fetch, tab_upload, tab_staged = st.tabs(["📡 Fetch from PSE EDGE", "📤 Upload PDFs", "📁 Staged Reports"])
+    tab_fetch, tab_staged = st.tabs(["📡 Fetch from PSE EDGE", "📁 Staged Reports"])
 
     with tab_fetch:
         st.caption("Downloads directly from documents.pse.com.ph. Weekends/holidays return 404 and are skipped automatically.")
@@ -111,22 +110,6 @@ def render() -> None:
                 result = run_pipeline(download=True, start_date=start, end_date=end)
             _show_result(result)
 
-    with tab_upload:
-        st.caption("For offline reports, or PDFs you already downloaded yourself.")
-        uploaded_files = st.file_uploader(
-            "Upload PSE EOD quotation PDFs", type=["pdf"], accept_multiple_files=True, key="pdf_upload",
-        )
-        if uploaded_files and st.button("Save & Process", type="primary", key="upload_btn"):
-            PDF_REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-            saved_paths = []
-            for f in uploaded_files:
-                path = PDF_REPORTS_DIR / f.name
-                path.write_bytes(f.getvalue())
-                saved_paths.append(path)
-            with st.spinner("Processing uploaded reports..."):
-                result = run_pipeline(pdf_paths=saved_paths)
-            _show_result(result)
-
     with tab_staged:
         staged = list_staged_pdfs()
         st.caption(f"{len(staged)} PDF report(s) currently staged in `data/pdf_reports/`.")
@@ -137,4 +120,4 @@ def render() -> None:
                     result = run_pipeline(pdf_paths=staged)
                 _show_result(result)
         else:
-            st.write("No PDFs staged yet — use the Fetch or Upload tabs.")
+            st.write("No PDFs staged yet — use the Fetch tab.")
