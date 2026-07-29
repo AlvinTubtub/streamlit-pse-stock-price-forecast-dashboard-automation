@@ -10,8 +10,8 @@ This repository is the fully Python-based version of the project. The previous H
 - Company list and sector browsing
 - Company details with historical charts
 - Model comparison across forecasting methods
-- **Update Data**: native PDF ingestion pipeline that fetches or accepts PSE EDGE End-of-Day quotation PDFs, extracts/cleans/validates OHLCV rows, and merges them into `data/raw/` — runs automatically via GitHub Actions on every trading day, or on demand from the app
-- **Automated model training + selection**: after every successful ingestion, all three forecasting models are retrained per ticker, evaluated (RMSE/MAE/MAPE/R²), saved to `models/`, and the lowest-RMSE model per ticker is recorded in `best_models.json` — see [Model Training Pipeline](#model-training-pipeline) below
+- **Update Data**: native PDF ingestion pipeline that fetches PSE EDGE End-of-Day quotation PDFs (or processes ones already staged locally), extracts/cleans/validates OHLCV rows, and merges them into `data/raw/` — runs automatically via GitHub Actions daily at 3:00 PM, 4:00 PM, and 5:00 PM PHT, or on demand from the app
+- **Automated model training + selection**: after every successful ingestion, all three forecasting models are retrained per ticker, evaluated (RMSE/MAE/MASE/R²), saved to `models/`, and the lowest-RMSE model per ticker is recorded in `best_models.json` — see [Model Training Pipeline](#model-training-pipeline) below
 - Educational section explaining OHLCV and forecasting models
 - About page for project context and capstone background
 
@@ -50,7 +50,7 @@ PSE EDGE PDF -> PDF Extraction -> CSV Generation -> Data Validation
 - `services/forecasting/lstm_model.py` — multi-feature LSTM
   (Open/High/Low/Close/Volume + indicators), sequence length 30,
   chronological train/val/test split, early stopping, checkpointing.
-- `services/evaluation.py` — shared RMSE/MAE/MAPE/R² metrics.
+- `services/evaluation.py` — shared RMSE/MAE/MASE/R² metrics.
 - `services/model_selector.py` — orchestrates training all three models
   per ticker, saves them under `models/`, and writes `best_models.json`.
 
@@ -92,7 +92,7 @@ pse-streamlit-2/
 │   │   ├── SECB.csv
 │   │   ├── SHLPH.csv
 │   │   └── SMPH.csv
-│   ├── pdf_reports/        # staged/uploaded PSE EDGE EOD PDFs (gitignored, except bundled samples)
+│   ├── pdf_reports/        # staged PSE EDGE EOD PDFs (gitignored, except bundled samples)
 │   └── pdf_pipeline/       # intermediate ETL artifacts + pipeline.log (gitignored)
 ├── models/                 # trained model artifacts (gitignored contents; structure tracked)
 │   ├── lag_regression/     # <TICKER>.pkl
@@ -112,7 +112,7 @@ pse-streamlit-2/
 │   ├── data_loader.py
 │   ├── data_validator.py
 │   ├── feature_engineering.py   # lag + technical-indicator features, shared by all models
-│   ├── evaluation.py            # shared RMSE/MAE/MAPE/R² metrics
+│   ├── evaluation.py            # shared RMSE/MAE/MASE/R² metrics
 │   ├── model_selector.py        # trains all 3 models per ticker, saves them, picks the best
 │   ├── forecasting/
 │   │   ├── __init__.py          # run_all_models() — legacy on-the-fly training, no persistence
@@ -128,7 +128,6 @@ pse-streamlit-2/
 │       ├── merge.py
 │       └── pipeline.py     # calls services.model_selector after every successful merge
 ├── ui/
-└── legacy/
 ```
 
 Requirements
@@ -199,9 +198,8 @@ Update Market Data (PDF Pipeline)
 
 The Update Data page (services/pdf_pipeline/) turns official PSE EDGE End-of-Day quotation report PDFs into the same data/raw/<SYMBOL>.csv files everything else in the app reads — no separate project or manual conversion step needed.
 
-Three ways to feed it reports:
+Two ways to feed it reports:
 - Fetch from PSE EDGE: pick a date range and it downloads directly from documents.pse.com.ph (weekends/holidays 404 and are skipped automatically).
-- Upload PDFs: drag in PDFs you already have.
 - Staged Reports: process whatever's already sitting in data/pdf_reports/ (the repo ships with sample reports for 2026-07-01 through 2026-07-27 pre-staged there).
 
 Pipeline steps, each reusable on its own:
@@ -215,7 +213,7 @@ After a successful run, the dashboard's cached data is cleared automatically, so
 
 ## Automated Data Updates
 
-Every Philippine trading day, `data/raw/<SYMBOL>.csv` is updated automatically — no one has to open the app or click anything.
+Every day, `data/raw/<SYMBOL>.csv` is updated automatically, three times a day — no one has to open the app or click anything.
 
 ```text
 GitHub Actions
@@ -238,7 +236,7 @@ Streamlit Dashboard
 
 ### Schedule
 
-`.github/workflows/update_data.yml` runs on a cron schedule of `30 10 * * 1-5` (UTC) — Monday through Friday at **6:30 PM Philippine Time** (UTC+8, no DST), timed to run after PSE publishes its end-of-day disclosures.
+`.github/workflows/update_data.yml` runs on three cron schedules — `0 7 * * *`, `0 8 * * *`, `0 9 * * *` (UTC) — daily at **3:00 PM, 4:00 PM, and 5:00 PM Philippine Time** (UTC+8, no DST), so a report that publishes late in one run is picked up by the next one that same afternoon.
 
 ### Manual run (workflow_dispatch)
 
