@@ -3,7 +3,9 @@ pandas
 numpy
 scikit-learn
 statsmodels
+pmdarima
 torch
+joblib
 plotly
 pdfplumber
 requests

@@ -16,6 +16,11 @@ on:
         description: "Optional end date override (YYYY-MM-DD)"
         required: false
         type: string
+      skip_training:
+        description: "Skip model retraining (only refresh data/raw/ CSVs)"
+        required: false
+        type: boolean
+        default: false
 
 # Least privilege: this job only ever reads the repo and, if data changed,
 # pushes a commit back to it.
@@ -62,6 +67,9 @@ jobs:
           if [ -n "${{ github.event.inputs.end_date }}" ]; then
             ARGS="$ARGS --end-date ${{ github.event.inputs.end_date }}"
           fi
+          if [ "${{ github.event.inputs.skip_training }}" = "true" ]; then
+            ARGS="$ARGS --no-train"
+          fi
           python run_pipeline.py $ARGS
 
       - name: Verify generated CSVs exist
@@ -85,13 +93,13 @@ jobs:
       - name: Check for changes
         id: changes
         run: |
-          git add -A data/raw
+          git add -A data/raw models best_models.json
           if git diff --cached --quiet; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "No changes to data/raw/ — nothing to commit."
+            echo "No changes to data/raw/ or models/ — nothing to commit."
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "Changes detected in data/raw/:"
+            echo "Changes detected:"
             git diff --cached --stat
           fi
 
@@ -107,7 +115,7 @@ jobs:
 
       - name: Skip commit (no changes)
         if: steps.changes.outputs.changed == 'false'
-        run: echo "Data is already up to date — skipping commit to avoid an empty commit."
+        run: echo "Data and models are already up to date — skipping commit to avoid an empty commit."
 
       - name: Upload pipeline log
         if: always()

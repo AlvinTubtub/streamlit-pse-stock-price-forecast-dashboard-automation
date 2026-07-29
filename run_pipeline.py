@@ -42,9 +42,14 @@ def _parse_args() -> argparse.Namespace:
         "--no-download", dest="download", action="store_false",
         help="Skip fetching new reports from PSE EDGE; only process PDFs already in data/pdf_reports/.",
     )
+    parser.add_argument(
+        "--no-train", dest="train_models", action="store_false",
+        help="Skip model retraining after ingestion (only update data/raw/ CSVs). "
+             "Useful for lightweight CI runs that don't need scikit-learn/statsmodels/torch installed.",
+    )
     parser.add_argument("--start-date", type=_parse_date, default=None, help="YYYY-MM-DD, defaults to the day after the newest data on file.")
     parser.add_argument("--end-date", type=_parse_date, default=None, help="YYYY-MM-DD, defaults to today.")
-    parser.set_defaults(download=True)
+    parser.set_defaults(download=True, train_models=True)
     return parser.parse_args()
 
 
@@ -62,8 +67,15 @@ def main() -> int:
     print("Cleaning...")
     print("Validating...")
     print("Merging...")
+    if args.train_models:
+        print("Training models...")
 
-    result = run_pipeline(download=args.download, start_date=args.start_date, end_date=args.end_date)
+    result = run_pipeline(
+        download=args.download,
+        start_date=args.start_date,
+        end_date=args.end_date,
+        train_models=args.train_models,
+    )
 
     elapsed = round(time.monotonic() - started, 2)
     status = result["status"]
@@ -81,6 +93,8 @@ def main() -> int:
         print(f"Symbols updated : {len(result['merge_summaries'])}")
     if result["post_validation_errors"]:
         print(f"Post-validation failures: {len(result['post_validation_errors'])}")
+    if result["training"]:
+        print(f"Models trained  : {len(result['training']['best_models'])} ticker(s)")
     print(f"Status          : {status}")
     print(f"Elapsed         : {elapsed}s")
     print("-" * 60)

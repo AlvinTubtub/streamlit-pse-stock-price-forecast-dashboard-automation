@@ -1,10 +1,19 @@
-# Minimal dependency set for run_pipeline.py / services/pdf_pipeline/.
-# Used by .github/workflows/update_data.yml so the scheduled data-update
-# job doesn't need to install the full app stack (torch, streamlit,
-# statsmodels, scikit-learn) just to download/parse/merge CSVs.
+# Dependency set for run_pipeline.py / services/pdf_pipeline/.
+# Used by .github/workflows/update_data.yml for the scheduled data-update
+# job. Since objective #10 (automated retraining after every ingestion)
+# runs the full model-training pipeline as part of this same job, this now
+# includes the ML stack too — not just the PDF download/parse/merge deps.
 #
-# For running the Streamlit app itself, use requirements.txt instead.
+# If you want a lightweight CI run that only refreshes data/raw/ without
+# retraining models, run `python run_pipeline.py --no-train`: that path
+# only needs pandas/numpy/pdfplumber/requests, so trimming this file back
+# down for that use case is safe.
 pandas
 numpy
 pdfplumber
 requests
+scikit-learn
+statsmodels
+pmdarima
+torch
+joblib

@@ -82,6 +82,7 @@ def run_pipeline(
     download: bool = False,
     start_date: date | None = None,
     end_date: date | None = None,
+    train_models: bool = True,
 ) -> dict:
     """Runs the full pipeline and returns a structured result dict:
 
@@ -95,6 +96,7 @@ def run_pipeline(
             "validation": {...} | None,
             "merge_summaries": [{...}, ...],
             "post_validation_errors": [(symbol, message), ...],
+            "training": {"best_models": {...}} | None,
             "error": str | None,
         }
 
@@ -107,6 +109,15 @@ def run_pipeline(
     extractable rows, a handful of duplicate records) are logged and
     skipped rather than aborting the run — the pipeline only reports
     "error" for failures that leave it with nothing usable to merge.
+
+    If train_models=True (the default) and at least one symbol was merged
+    successfully, the full model-training pipeline (feature engineering ->
+    train Lag Regression/ARIMA/LSTM -> evaluate -> pick each ticker's best
+    model -> save models + best_models.json) runs automatically at the end
+    — see services/model_selector.py. A training failure is logged but
+    never turns an otherwise-successful ingestion into an "error" result;
+    the freshly merged CSVs are still valid even if retraining had a
+    problem, and the dashboard falls back to previously-saved models.
     """
     _configure_logging()
     started_at = datetime.now()
@@ -128,6 +139,7 @@ def run_pipeline(
         "validation": None,
         "merge_summaries": [],
         "post_validation_errors": [],
+        "training": None,
         "error": None,
     }
 
@@ -211,6 +223,17 @@ def run_pipeline(
             except CSVValidationError as exc:
                 result["post_validation_errors"].append((summary["symbol"], str(exc)))
                 log.error("Post-merge validation failed for %s: %s", summary["symbol"], exc)
+
+        if train_models and merge_summaries:
+            log.info("Retraining models for %d updated symbol(s)...", len(merge_summaries))
+            try:
+                from services.model_selector import train_and_select_all
+
+                best_models = train_and_select_all()
+                result["training"] = {"best_models": best_models}
+                log.info("Model training complete: %d ticker(s) now have saved models.", len(best_models))
+            except Exception:
+                log.exception("Model training failed after a successful ingestion — dashboard will keep using previously-saved models.")
 
         if result["post_validation_errors"]:
             return _finish("merged_with_warnings")
