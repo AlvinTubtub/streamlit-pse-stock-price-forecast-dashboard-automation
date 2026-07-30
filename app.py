@@ -23,11 +23,36 @@ from pages_app import about, companies, compare, details, home, learn
 from ui.components import educational_banner
 
 # ---------- DEBUG ----------
+import traceback
+import subprocess
+from pathlib import Path
 import ui.data
 
 print("=" * 80)
-print("Loaded ui.data from:", ui.data.__file__)
-print("Members:", dir(ui.data))
+print("Git commit:")
+print(
+    subprocess.check_output(
+        ["git", "rev-parse", "HEAD"],
+        text=True,
+    ).strip()
+)
+
+print("=" * 80)
+print("Loaded ui.data from:")
+print(ui.data.__file__)
+
+print("=" * 80)
+print("Module members:")
+print(sorted(dir(ui.data)))
+
+print("=" * 80)
+print("First 120 lines of ui.data:")
+with open(ui.data.__file__, "r", encoding="utf-8") as f:
+    for i, line in enumerate(f, 1):
+        print(f"{i:03d}: {line.rstrip()}")
+        if i >= 120:
+            break
+
 print("=" * 80)
 
 try:
