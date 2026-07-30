@@ -42,6 +42,23 @@ init_state()
 
 companies_data, dataframes, results, missing = get_dashboard_data()
 
+st.divider()
+st.subheader("DEBUG")
+
+st.write("BPI DataFrame tail:")
+st.dataframe(dataframes["BPI"].tail())
+
+st.write("Latest dataframe row:")
+st.write(dataframes["BPI"].iloc[-1])
+
+company = next(c for c in companies if c["symbol"] == "BPI")
+
+st.write("Latest company object:")
+st.json({
+    "latestClose": company["latestClose"],
+    "lastOHLCV": company["ohlcv"][-1]
+})
+
 top_nav(companies_data)
 
 latest_run = get_latest_processed()
