@@ -15,11 +15,30 @@ or trains anything itself; there is no in-app way to trigger any of that.
 """
 from __future__ import annotations
 
+import traceback
+
 import streamlit as st
 
 from pages_app import about, companies, compare, details, home, learn
 from ui.components import educational_banner
-from ui.data import get_dashboard_data, get_latest_processed
+
+# ---------- DEBUG ----------
+import ui.data
+
+print("=" * 80)
+print("Loaded ui.data from:", ui.data.__file__)
+print("Members:", dir(ui.data))
+print("=" * 80)
+
+try:
+    get_dashboard_data = ui.data.get_dashboard_data
+    get_latest_processed = ui.data.get_latest_processed
+except Exception:
+    print("\nERROR while resolving ui.data symbols:\n")
+    traceback.print_exc()
+    raise
+# ---------------------------
+
 from ui.nav import init_state, top_nav
 from ui.theme import inject_css
 
