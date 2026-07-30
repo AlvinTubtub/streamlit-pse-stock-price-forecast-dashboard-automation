@@ -1,14 +1,28 @@
-name: Update PSE Market Data
+name: PSE Data & Model Pipeline
 
-# Runs daily at 3:00 PM, 4:00 PM, and 5:00 PM PHT (UTC+8, no DST) — i.e.
-# 07:00, 08:00, 09:00 UTC — so a report that publishes late in one run is
-# picked up by the next one that same afternoon. Also runnable on demand
-# from the Actions tab.
+# This workflow has NO GitHub-native cron schedule by design. It is the
+# single orchestration layer for the whole project (PDF ingestion ->
+# feature engineering -> model training -> evaluation -> best-model
+# selection -> commit) and is triggered externally by Cron-job.org,
+# Monday-Friday at 4:00 PM Philippine Time (UTC+8, no DST) — i.e.
+# 08:00 UTC — via a repository_dispatch call:
+#
+#   URL:     https://api.github.com/repos/<OWNER>/<REPO>/dispatches
+#   Method:  POST
+#   Headers: Accept: application/vnd.github+json
+#            Authorization: Bearer <GITHUB_PAT with 'repo' + 'workflow' scope>
+#            X-GitHub-Api-Version: 2022-11-28
+#   Body:    {"event_type": "run-pipeline"}
+#
+# Configure that as a Cron-job.org "Custom HTTP request" job with the
+# schedule above and the GitHub PAT stored as a Cron-job.org request
+# header (never commit it to this repo). workflow_dispatch is also kept
+# so a maintainer can trigger the exact same run from the Actions tab —
+# that's an operator/ops action outside the deployed app, not a feature
+# of the Streamlit dashboard, which has no update capability at all.
 on:
-  schedule:
-    - cron: "0 7 * * *"
-    - cron: "0 8 * * *"
-    - cron: "0 9 * * *"
+  repository_dispatch:
+    types: [run-pipeline]
   workflow_dispatch:
     inputs:
       start_date:
@@ -19,11 +33,6 @@ on:
         description: "Optional end date override (YYYY-MM-DD)"
         required: false
         type: string
-      skip_training:
-        description: "Skip model retraining (only refresh data/raw/ CSVs)"
-        required: false
-        type: boolean
-        default: false
 
 # Least privilege: this job only ever reads the repo and, if data changed,
 # pushes a commit back to it.
@@ -31,13 +40,13 @@ permissions:
   contents: write
 
 concurrency:
-  group: update-pse-data
+  group: pse-pipeline
   cancel-in-progress: false
 
 jobs:
-  update-data:
+  run-pipeline:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -63,15 +72,14 @@ jobs:
       - name: Run pipeline
         id: pipeline
         run: |
-          ARGS=""
-          if [ -n "${{ github.event.inputs.start_date }}" ]; then
-            ARGS="$ARGS --start-date ${{ github.event.inputs.start_date }}"
+          ARGS="--download"
+          START_DATE="${{ github.event.inputs.start_date || github.event.client_payload.start_date }}"
+          END_DATE="${{ github.event.inputs.end_date || github.event.client_payload.end_date }}"
+          if [ -n "$START_DATE" ]; then
+            ARGS="$ARGS --start-date $START_DATE"
           fi
-          if [ -n "${{ github.event.inputs.end_date }}" ]; then
-            ARGS="$ARGS --end-date ${{ github.event.inputs.end_date }}"
-          fi
-          if [ "${{ github.event.inputs.skip_training }}" = "true" ]; then
-            ARGS="$ARGS --no-train"
+          if [ -n "$END_DATE" ]; then
+            ARGS="$ARGS --end-date $END_DATE"
           fi
           python run_pipeline.py $ARGS
 
@@ -96,24 +104,24 @@ jobs:
       - name: Check for changes
         id: changes
         run: |
-          git add -A data/raw models best_models.json
+          git add -A data/raw models prediction_cache best_models.json latest_processed.json
           if git diff --cached --quiet; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "No changes to data/raw/ or models/ — nothing to commit."
+            echo "No changes detected — nothing to commit."
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
             echo "Changes detected:"
             git diff --cached --stat
           fi
 
-      - name: Commit and push updated CSVs
+      - name: Commit and push updated artifacts
         if: steps.changes.outputs.changed == 'true'
         env:
           TZ: Asia/Manila
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git commit -m "Auto-update PSE data ($(date +%Y-%m-%d))"
+          git commit -m "Automated pipeline run: data + models ($(date +%Y-%m-%d\ %H:%M))"
           git push
 
       - name: Skip commit (no changes)
