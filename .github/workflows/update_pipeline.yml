@@ -72,7 +72,7 @@ jobs:
       - name: Run pipeline
         id: pipeline
         run: |
-          ARGS="--download"
+          ARGS=""
           START_DATE="${{ github.event.inputs.start_date || github.event.client_payload.start_date }}"
           END_DATE="${{ github.event.inputs.end_date || github.event.client_payload.end_date }}"
           if [ -n "$START_DATE" ]; then
