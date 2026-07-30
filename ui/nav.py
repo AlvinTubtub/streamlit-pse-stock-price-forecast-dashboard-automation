@@ -13,7 +13,6 @@ PAGES = [
     ("home", "🏠 Home"),
     ("companies", "🏢 Company List"),
     ("compare", "📊 Model Performance"),
-    ("data", "🔄 Update Data"),
     ("learn", "📖 Learn Stocks"),
     ("about", "ℹ️ About"),
 ]
