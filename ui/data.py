@@ -41,17 +41,37 @@ MODEL_LABELS = {
 }
 
 
+def _file_signature(path: Path) -> tuple[str, int, int] | tuple[str, None, None]:
+    rel_path = path.relative_to(BASE_DIR).as_posix()
+    if not path.exists():
+        return (rel_path, None, None)
+    stat = path.stat()
+    return (rel_path, stat.st_size, stat.st_mtime_ns)
+
+
+def _pipeline_artifact_signature() -> tuple[tuple[str, int, int] | tuple[str, None, None], ...]:
+    """Returns a stable cache key for files produced by the pipeline."""
+    files = [
+        *sorted(DATA_DIR.glob("*.csv")),
+        *sorted(PREDICTION_CACHE_DIR.glob("*.json")),
+        *sorted((BASE_DIR / "models").glob("**/*")),
+        BEST_MODELS_PATH,
+        LATEST_PROCESSED_PATH,
+    ]
+    return tuple(_file_signature(path) for path in files if path.is_file() or not path.exists())
+
+
 @st.cache_data(show_spinner=False)
-def _load_cached_results(symbol: str, _cache_mtime: float) -> dict:
+def _load_cached_results(symbol: str, cache_mtime: int) -> dict:
     """Loads the pipeline's cached training results for one symbol.
-    ``_cache_mtime`` is only there to bust Streamlit's cache when the
+    ``cache_mtime`` is only there to bust Streamlit's cache when the
     underlying JSON file changes (e.g. after the next pipeline run)."""
     path = PREDICTION_CACHE_DIR / f"{symbol}.json"
     return json.loads(path.read_text())
 
 
 @st.cache_data(show_spinner=False)
-def get_dashboard_data():
+def _get_dashboard_data_cached(cache_signature):
     """Returns (companies, dataframes, results_by_symbol, missing_symbols).
 
     ``results`` only contains symbols the pipeline has already produced a
@@ -62,8 +82,12 @@ def get_dashboard_data():
     for symbol in dataframes:
         cache_path = PREDICTION_CACHE_DIR / f"{symbol}.json"
         if cache_path.exists():
-            results[symbol] = _load_cached_results(symbol, cache_path.stat().st_mtime)
+            results[symbol] = _load_cached_results(symbol, cache_path.stat().st_mtime_ns)
     return companies, dataframes, results, missing
+
+
+def get_dashboard_data():
+    return _get_dashboard_data_cached(_pipeline_artifact_signature())
 
 
 def get_best_models() -> dict:
