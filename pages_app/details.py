@@ -3,7 +3,10 @@ from __future__ import annotations
 import streamlit as st
 
 from ui.charts import actual_vs_predicted_chart, forecast_error_chart, history_line_chart
+from ui.data import get_best_models
 from ui.nav import go_to
+
+_NEXT_CLOSE_KEY = {"Lag-Informed Regression": "lag", "ARIMA": "arima", "LSTM": "lstm"}
 
 
 def render(companies: list[dict], dataframes: dict, results: dict) -> None:
@@ -48,10 +51,17 @@ def render(companies: list[dict], dataframes: dict, results: dict) -> None:
             unsafe_allow_html=True,
         )
 
-    if df is None or result is None:
+    if df is None:
         st.warning(
-            f"No validated CSV found for **{symbol}** yet. Add `data/raw/{symbol}.csv` "
-            "(Date, Open, High, Low, Close, Volume) to unlock real charts and forecasts for this company."
+            f"No validated data found for **{symbol}** yet. It will appear here once the "
+            "automated pipeline processes a PSE EDGE report that includes it."
+        )
+        return
+
+    if result is None:
+        st.warning(
+            f"**{symbol}** has price history but hasn't been through model training yet. "
+            "It will show forecasts and model performance after the next automated pipeline run."
         )
         return
 
@@ -97,8 +107,14 @@ def render(companies: list[dict], dataframes: dict, results: dict) -> None:
 
     with right:
         preds = result["next_close"]
-        best_model = min(preds, key=lambda k: float(result["metrics"][{"lag": "lag_reg", "arima": "arima", "lstm": "lstm"}[k]]["rmse"]))
-        best_label = {"lag": "Lag-Informed Regression", "arima": "ARIMA", "lstm": "LSTM"}[best_model]
+        best_label = get_best_models().get(symbol)
+        best_model = _NEXT_CLOSE_KEY.get(best_label)
+        if best_model is None:
+            # Defensive fallback only — e.g. best_models.json predates this
+            # symbol. Derives the same "lowest RMSE" answer from the
+            # already-cached metrics, no retraining involved.
+            best_model = min(preds, key=lambda k: float(result["metrics"][{"lag": "lag_reg", "arima": "arima", "lstm": "lstm"}[k]]["rmse"]))
+            best_label = {"lag": "Lag-Informed Regression", "arima": "ARIMA", "lstm": "LSTM"}[best_model]
         pred_price = preds[best_model]
         direction = "Up" if pred_price >= latest_close else "Down"
         color = "#4ade80" if direction == "Up" else "#f87171"
@@ -118,7 +134,7 @@ def render(companies: list[dict], dataframes: dict, results: dict) -> None:
                     <p style="font-size:0.85rem; color:#cbd5e1; font-style:italic;">
                         The {best_label} model predicts {symbol}'s closing price may
                         <strong style="color:{color};">slightly {direction.lower()}</strong> next trading day,
-                        based on real historical patterns in the uploaded/bundled OHLCV data.
+                        based on real historical patterns in the automatically-refreshed OHLCV data.
                     </p>
                 </div>
             </div>
