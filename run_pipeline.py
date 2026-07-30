@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Headless runner for the PSE PDF ingestion pipeline.
+"""Headless runner for the fully-automated PSE data + model pipeline.
 
-Runs the exact same orchestrator the "Update Data" Streamlit page uses
-(services/pdf_pipeline.run_pipeline) with no Streamlit dependency at all,
-so it can run in GitHub Actions (or any cron/CI environment) and drive
-data/raw/<SYMBOL>.csv updates automatically.
+This is the *only* way the pipeline ever runs — there is no manual
+"update" capability inside the Streamlit app. In production it's invoked
+exclusively by .github/workflows/update_pipeline.yml, which is itself
+triggered externally by Cron-job.org (Monday-Friday, 4:00 PM Philippine
+Time) via a repository_dispatch call — see that workflow file and the
+README's "Automated Pipeline" section for the exact setup.
 
 Usage:
     python run_pipeline.py                  # download new reports, then process everything staged

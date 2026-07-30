@@ -1,4 +1,4 @@
-"""Orchestrates the full PDF ingestion pipeline:
+"""Orchestrates the full PDF ingestion + model-training pipeline:
 
     1. Download latest PSE EOD reports (optional)
     2. Extract quotation rows from staged PDFs
@@ -7,17 +7,25 @@
     5. Merge into data/raw/<SYMBOL>.csv (upsert by date)
     6. Re-validate each touched CSV with the app's own validator, so a bad
        merge can never silently break the forecasting/dashboard modules
+    7. Retrain all forecasting models and select the best one per ticker
+       (services/model_selector.py)
+    8. Write latest_processed.json so the dashboard knows the run happened
 
-Mirrors the four-step workflow from the standalone pse-pdf-pipeline's
-run_pipeline.py, refactored into one function that returns a structured
-result instead of only printing to the console — this is what the
-Streamlit page and any future CLI/cron entrypoint both call.
+This is the single orchestration layer for the whole project. It is
+called exclusively from run_pipeline.py (headless, no Streamlit
+dependency), which in turn is only ever invoked by the scheduled GitHub
+Actions workflow (.github/workflows/update_pipeline.yml, triggered
+externally by Cron-job.org). Streamlit never calls this — the dashboard
+is a pure read-only presentation layer over whatever this pipeline last
+committed to the repo (see ui/data.py).
 """
 from __future__ import annotations
 
+import json
 import logging
+import os
 import time
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -28,6 +36,7 @@ from .cleaner import clean_quotes
 from .config import (
     CLEANED_CSV,
     EARLIEST_REPORT_DATE,
+    LATEST_PROCESSED_PATH,
     MASTER_CSV,
     PDF_REPORTS_DIR,
     PIPELINE_LOG,
@@ -77,6 +86,29 @@ def latest_raw_date(raw_dir: Path = RAW_DIR) -> date | None:
     return latest
 
 
+def _write_latest_processed(result: dict) -> None:
+    """Writes repo-root latest_processed.json — the single file the
+    read-only Streamlit dashboard checks to know when data was last
+    refreshed and by which run. Written on every run, success or not, so
+    the dashboard always reflects the true state of the last attempt.
+    """
+    payload = {
+        "last_run_at": (result["finished_at"] or datetime.now()).astimezone(timezone.utc).isoformat(timespec="seconds"),
+        "status": result["status"],
+        "duration_seconds": result["duration_seconds"],
+        "pdf_count": result["pdf_count"],
+        "record_count": result["record_count"],
+        "symbols_updated": [s["symbol"] for s in result["merge_summaries"]],
+        "best_models_updated": len(result["training"]["best_models"]) if result["training"] else 0,
+        "triggered_by": os.environ.get("GITHUB_EVENT_NAME", "manual"),
+        "error": result["error"],
+    }
+    try:
+        LATEST_PROCESSED_PATH.write_text(json.dumps(payload, indent=2))
+    except Exception:
+        log.exception("Failed to write %s", LATEST_PROCESSED_PATH)
+
+
 def run_pipeline(
     pdf_paths: list[Path] | None = None,
     download: bool = False,
@@ -118,6 +150,10 @@ def run_pipeline(
     never turns an otherwise-successful ingestion into an "error" result;
     the freshly merged CSVs are still valid even if retraining had a
     problem, and the dashboard falls back to previously-saved models.
+
+    Every run — successful or not — writes repo-root latest_processed.json
+    with the outcome, so the (read-only) Streamlit dashboard can always
+    show when data was last refreshed without executing anything itself.
     """
     _configure_logging()
     started_at = datetime.now()
@@ -153,6 +189,7 @@ def run_pipeline(
             result["status"], result["duration_seconds"], result["pdf_count"], result["parsed_count"], result["record_count"],
         )
         log.info("=" * 60)
+        _write_latest_processed(result)
         return result
 
     try:

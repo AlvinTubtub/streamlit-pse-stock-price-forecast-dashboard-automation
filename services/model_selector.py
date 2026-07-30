@@ -6,10 +6,10 @@ results (metrics/predictions/backtests) for the dashboard to load without
 retraining, and writes ``best_models.json`` mapping each ticker to
 whichever model had the lowest test-set RMSE.
 
-Called automatically after every successful PDF ingestion (see
-services/pdf_pipeline/pipeline.py) and by the standalone
-``python -m services.model_selector`` / run_pipeline.py CLI entrypoints —
-never from inside the Streamlit dashboard itself.
+Called exclusively by services/pdf_pipeline/pipeline.py after every
+successful merge, and by the standalone ``python -m services.model_selector``
+entrypoint for local/manual runs — never from inside the Streamlit
+dashboard, which only ever reads what this module wrote.
 
 Directory layout produced:
 
@@ -17,8 +17,8 @@ Directory layout produced:
         lag_regression/<TICKER>.pkl
         arima/<TICKER>.pkl
         lstm/<TICKER>.pth
-        predictions/<TICKER>.json   # cached metrics + predictions for ui/data.py
-    best_models.json                # {"BDO": "LSTM", "MER": "ARIMA", ...}
+    prediction_cache/<TICKER>.json   # cached metrics + predictions for ui/data.py
+    best_models.json                 # {"BDO": "LSTM", "MER": "ARIMA", ...}
 """
 from __future__ import annotations
 
@@ -40,12 +40,12 @@ MODELS_DIR = BASE_DIR / "models"
 LAG_MODELS_DIR = MODELS_DIR / "lag_regression"
 ARIMA_MODELS_DIR = MODELS_DIR / "arima"
 LSTM_MODELS_DIR = MODELS_DIR / "lstm"
-PREDICTIONS_DIR = MODELS_DIR / "predictions"
+PREDICTION_CACHE_DIR = BASE_DIR / "prediction_cache"
 BEST_MODELS_PATH = BASE_DIR / "best_models.json"
 
 
 def _ensure_dirs() -> None:
-    for d in (LAG_MODELS_DIR, ARIMA_MODELS_DIR, LSTM_MODELS_DIR, PREDICTIONS_DIR):
+    for d in (LAG_MODELS_DIR, ARIMA_MODELS_DIR, LSTM_MODELS_DIR, PREDICTION_CACHE_DIR):
         d.mkdir(parents=True, exist_ok=True)
 
 
@@ -123,7 +123,7 @@ def train_and_select_all(raw_dir: Path = RAW_DIR) -> dict[str, str]:
         best_key = select_best_model(result["metrics"], ["lag_reg", "arima", "lstm"])
         best_models[symbol] = MODEL_LABELS[best_key]
 
-        (PREDICTIONS_DIR / f"{symbol}.json").write_text(json.dumps(result, indent=2))
+        (PREDICTION_CACHE_DIR / f"{symbol}.json").write_text(json.dumps(result, indent=2))
         log.info("%s best model: %s (RMSE %s)", symbol, MODEL_LABELS[best_key], result["metrics"][best_key]["rmse"])
 
     BEST_MODELS_PATH.write_text(json.dumps(best_models, indent=2, sort_keys=True))

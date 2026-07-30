@@ -25,6 +25,11 @@ PDF_REPORTS_DIR = BASE_DIR / "data" / "pdf_reports"
 PIPELINE_DIR = BASE_DIR / "data" / "pdf_pipeline"
 RAW_DIR = BASE_DIR / "data" / "raw"
 
+# Repo-root pipeline-run metadata, read by the Streamlit dashboard to show
+# when data was last refreshed — written once per run, regardless of
+# outcome (see services/pdf_pipeline/pipeline.py:_write_latest_processed).
+LATEST_PROCESSED_PATH = BASE_DIR / "latest_processed.json"
+
 MASTER_CSV = PIPELINE_DIR / "master_quotes.csv"
 CLEANED_CSV = PIPELINE_DIR / "cleaned_quotes.csv"
 VALIDATION_REPORT = PIPELINE_DIR / "validation_report.txt"
