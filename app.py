@@ -21,48 +21,11 @@ import streamlit as st
 
 from pages_app import about, companies, compare, details, home, learn
 from ui.components import educational_banner
-
-# ---------- DEBUG ----------
-import traceback
-import subprocess
-from pathlib import Path
-import ui.data
-
-print("=" * 80)
-print("Git commit:")
-print(
-    subprocess.check_output(
-        ["git", "rev-parse", "HEAD"],
-        text=True,
-    ).strip()
-)
-
-print("=" * 80)
-print("Loaded ui.data from:")
-print(ui.data.__file__)
-
-print("=" * 80)
-print("Module members:")
-print(sorted(dir(ui.data)))
-
-print("=" * 80)
-print("First 120 lines of ui.data:")
-with open(ui.data.__file__, "r", encoding="utf-8") as f:
-    for i, line in enumerate(f, 1):
-        print(f"{i:03d}: {line.rstrip()}")
-        if i >= 120:
-            break
-
-print("=" * 80)
-
-try:
-    get_dashboard_data = ui.data.get_dashboard_data
-    get_latest_processed = ui.data.get_latest_processed
-except Exception:
-    print("\nERROR while resolving ui.data symbols:\n")
-    traceback.print_exc()
-    raise
-# ---------------------------
+from pages_app import about, companies, compare, details, home, learn
+from ui.components import educational_banner
+from ui.data import get_dashboard_data, get_latest_processed
+from ui.nav import init_state, top_nav
+from ui.theme import inject_css
 
 from ui.nav import init_state, top_nav
 from ui.theme import inject_css
