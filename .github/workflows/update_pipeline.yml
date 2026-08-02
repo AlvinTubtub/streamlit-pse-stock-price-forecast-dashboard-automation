@@ -156,44 +156,58 @@ jobs:
 
       - name: Notify Telegram (Success)
         if: success()
+        env:
+          STREAMLIT_URL: https://YOUR-STREAMLIT-APP.streamlit.app
         run: |
+          COMMIT=$(git rev-parse --short HEAD)
+          RUNTIME="${SECONDS:-0}"
+
           MESSAGE=$(cat <<EOF
-          📈 *PSE Forecast Pipeline*
-
-          ✅ Status: SUCCESS
-
-          📅 Date: $(date '+%Y-%m-%d')
-
-          🕓 Time: $(date '+%I:%M %p %Z')
-
-          📊 Dashboard Updated
-
-          🚀 Streamlit will now serve the latest data.
+          📈 *PSE Stock Price Forecast Pipeline*
+          
+          ━━━━━━━━━━━━━━━━━━━━
+          
+          ✅ *Status*
+          SUCCESS
+          
+          📅 *Trading Date*
+          $(date '+%Y-%m-%d')
+          
+          🕒 *Completed*
+          $(date '+%I:%M %p') Philippine Time
+          
+          🏢 *Companies Processed*
+          15
+          
+          📊 *Records Updated*
+          15 CSV files
+          
+          🤖 *Models Updated*
+          • Lag-Informed Regression
+          • ARIMA
+          • LSTM
+          
+          📈 *Dashboard*
+          Successfully updated
+          
+          🔗 *Commit*
+          $COMMIT
+          
+          🔗 *GitHub Actions*
+          ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          
+          🌐 *Dashboard*
+          $STREAMLIT_URL
+          
+          ━━━━━━━━━━━━━━━━━━━━
+          
+          🚀 *Streamlit dashboard is ready.*
           EOF
           )
-
-          curl -s -X POST \
-            "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -d parse_mode="Markdown" \
-            --data-urlencode text="$MESSAGE"
-
-      - name: Notify Telegram (Failure)
-        if: failure()
-        run: |
-          MESSAGE=$(cat <<EOF
-          ❌ *PSE Forecast Pipeline Failed*
-
-          📅 Date: $(date '+%Y-%m-%d')
-
-          🕓 Time: $(date '+%I:%M %p %Z')
-
-          Please check the GitHub Actions logs.
-          EOF
-          )
-
-          curl -s -X POST \
-            "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -d parse_mode="Markdown" \
-            --data-urlencode text="$MESSAGE"
+          
+                    curl -s -X POST \
+                      "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+                      -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+                      -d parse_mode="Markdown" \
+                      --data-urlencode text="$MESSAGE"
+                      --data-urlencode text="$MESSAGE"
