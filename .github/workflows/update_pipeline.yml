@@ -12,30 +12,30 @@ name: PSE Data & Model Pipeline
 #   Headers: Accept: application/vnd.github+json
 #            Authorization: Bearer <GITHUB_PAT with 'repo' + 'workflow' scope>
 #            X-GitHub-Api-Version: 2022-11-28
-#   Body:    {"event_type": "run-pipeline"}
+#   Body:    {"event_type":"run-pipeline"}
 #
 # Configure that as a Cron-job.org "Custom HTTP request" job with the
 # schedule above and the GitHub PAT stored as a Cron-job.org request
 # header (never commit it to this repo). workflow_dispatch is also kept
-# so a maintainer can trigger the exact same run from the Actions tab —
-# that's an operator/ops action outside the deployed app, not a feature
-# of the Streamlit dashboard, which has no update capability at all.
+# so a maintainer can trigger the exact same run from the Actions tab.
+
 on:
   repository_dispatch:
-    types: [run-pipeline]
+    types:
+      - run-pipeline
+
   workflow_dispatch:
     inputs:
       start_date:
         description: "Optional start date override (YYYY-MM-DD)"
         required: false
         type: string
+
       end_date:
         description: "Optional end date override (YYYY-MM-DD)"
         required: false
         type: string
 
-# Least privilege: this job only ever reads the repo and, if data changed,
-# pushes a commit back to it.
 permissions:
   contents: write
 
@@ -47,6 +47,10 @@ jobs:
   run-pipeline:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+
+    env:
+      TZ: Asia/Manila
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -67,36 +71,47 @@ jobs:
             ${{ runner.os }}-pip-
 
       - name: Install dependencies
-        run: pip install -r requirements-pipeline.txt
+        run: |
+          pip install -r requirements-pipeline.txt
 
       - name: Run pipeline
         id: pipeline
         run: |
           ARGS=""
+
           START_DATE="${{ github.event.inputs.start_date || github.event.client_payload.start_date }}"
           END_DATE="${{ github.event.inputs.end_date || github.event.client_payload.end_date }}"
+
           if [ -n "$START_DATE" ]; then
             ARGS="$ARGS --start-date $START_DATE"
           fi
+
           if [ -n "$END_DATE" ]; then
             ARGS="$ARGS --end-date $END_DATE"
           fi
+
           python run_pipeline.py $ARGS
 
       - name: Verify generated CSVs exist
         run: |
           shopt -s nullglob
+
           files=(data/raw/*.csv)
+
           if [ ${#files[@]} -eq 0 ]; then
             echo "::error::No CSV files found in data/raw/ — pipeline did not produce expected output."
             exit 1
           fi
-          echo "Found ${#files[@]} CSV file(s) in data/raw/:"
+
+          echo "Found ${#files[@]} CSV file(s):"
+
           for f in "${files[@]}"; do
             lines=$(wc -l < "$f")
+
             echo "  $f ($lines lines)"
+
             if [ "$lines" -lt 2 ]; then
-              echo "::error::$f looks empty (only $lines line(s))."
+              echo "::error::$f looks empty."
               exit 1
             fi
           done
@@ -105,9 +120,10 @@ jobs:
         id: changes
         run: |
           git add -A data/raw models prediction_cache best_models.json latest_processed.json
+
           if git diff --cached --quiet; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "No changes detected — nothing to commit."
+            echo "No changes detected."
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
             echo "Changes detected:"
@@ -116,17 +132,18 @@ jobs:
 
       - name: Commit and push updated artifacts
         if: steps.changes.outputs.changed == 'true'
-        env:
-          TZ: Asia/Manila
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git commit -m "Automated pipeline run: data + models ($(date +%Y-%m-%d\ %H:%M))"
+
+          git commit -m "Automated pipeline run: data + models ($(date '+%Y-%m-%d %H:%M'))"
+
           git push
 
       - name: Skip commit (no changes)
         if: steps.changes.outputs.changed == 'false'
-        run: echo "Data and models are already up to date — skipping commit to avoid an empty commit."
+        run: |
+          echo "Data and models are already up to date."
 
       - name: Upload pipeline log
         if: always()
@@ -136,3 +153,47 @@ jobs:
           path: data/pdf_pipeline/pipeline.log
           if-no-files-found: ignore
           retention-days: 14
+
+      - name: Notify Telegram (Success)
+        if: success()
+        run: |
+          MESSAGE=$(cat <<EOF
+          📈 *PSE Forecast Pipeline*
+
+          ✅ Status: SUCCESS
+
+          📅 Date: $(date '+%Y-%m-%d')
+
+          🕓 Time: $(date '+%I:%M %p %Z')
+
+          📊 Dashboard Updated
+
+          🚀 Streamlit will now serve the latest data.
+          EOF
+          )
+
+          curl -s -X POST \
+            "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d parse_mode="Markdown" \
+            --data-urlencode text="$MESSAGE"
+
+      - name: Notify Telegram (Failure)
+        if: failure()
+        run: |
+          MESSAGE=$(cat <<EOF
+          ❌ *PSE Forecast Pipeline Failed*
+
+          📅 Date: $(date '+%Y-%m-%d')
+
+          🕓 Time: $(date '+%I:%M %p %Z')
+
+          Please check the GitHub Actions logs.
+          EOF
+          )
+
+          curl -s -X POST \
+            "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d parse_mode="Markdown" \
+            --data-urlencode text="$MESSAGE"
