@@ -162,7 +162,6 @@ jobs:
           COMMIT=$(git rev-parse --short HEAD)
 
           MESSAGE=$(cat <<EOF
-          
           📈 *PSE Stock Price Forecast Pipeline*
           
           ━━━━━━━━━━━━━━━━━━━━
@@ -205,20 +204,19 @@ jobs:
           EOF
           )
           
-                    curl \
-                      --silent \
-                      --show-error \
-                      --request POST \
-                      "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-                      --data-urlencode "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
-                      --data-urlencode "parse_mode=Markdown" \
-                      --data-urlencode "text=$MESSAGE"
+          curl \
+            --silent \
+            --show-error \
+            --request POST \
+            "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            --data-urlencode "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+            --data-urlencode "parse_mode=Markdown" \
+            --data-urlencode "text=$MESSAGE"
 
       - name: Notify Telegram (Failure)
         if: failure()
         run: |
           MESSAGE=$(cat <<EOF
-          
           ❌ *PSE Stock Price Forecast Pipeline*
           
           ━━━━━━━━━━━━━━━━━━━━
@@ -237,11 +235,11 @@ jobs:
           EOF
           )
           
-                    curl \
-                      --silent \
-                      --show-error \
-                      --request POST \
-                      "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-                      --data-urlencode "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
-                      --data-urlencode "parse_mode=Markdown" \
-                      --data-urlencode "text=$MESSAGE"
+          curl \
+            --silent \
+            --show-error \
+            --request POST \
+            "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            --data-urlencode "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+            --data-urlencode "parse_mode=Markdown" \
+            --data-urlencode "text=$MESSAGE"
