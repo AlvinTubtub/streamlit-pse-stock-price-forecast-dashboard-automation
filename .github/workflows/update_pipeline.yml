@@ -157,7 +157,7 @@ jobs:
       - name: Notify Telegram (Success)
         if: success()
         env:
-          STREAMLIT_URL: https://YOUR-STREAMLIT-APP.streamlit.app
+          STREAMLIT_URL: https://app-pse-stock-price-forecast-dashboard-automation-2eusess3pgag.streamlit.app/
         run: |
           COMMIT=$(git rev-parse --short HEAD)
           RUNTIME="${SECONDS:-0}"
